@@ -282,6 +282,7 @@ def build_records(token, rows, cache):
             "id": rid,
             "交易名稱": r.get("Deal_Name"),
             "業務": name,
+            "業務Email": r.get("Owner.email") or "",
             "業務課": team,
             "Stage": stage,
             "進入此階段時間": entered_at,
@@ -321,6 +322,117 @@ STATUS_PRIORITY = {
     "new": 2, "tracking": 2,
     "unknown": 3,
 }
+
+
+# ---------------------------------------------------------------------------
+# 勾選寄信提醒功能（純前端，mailto: 開啟本機信箱，不會自動送出，也不需要任何伺服器）
+# 「已通知」標記存在瀏覽器 localStorage，只在同一台裝置/瀏覽器有效，不會跨裝置同步、
+# 也不會寫回 Zoho 或 GitHub（那需要後端，目前先不做，見 README）。
+# ---------------------------------------------------------------------------
+NOTIFY_SCRIPT = '''<script>
+(function () {
+  var STORE_KEY = "cyberbiz_notified_v1";
+
+  function loadNotified() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveNotified(map) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(map));
+  }
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function paintNotified() {
+    var map = loadNotified();
+    document.querySelectorAll(".deal-card").forEach(function (card) {
+      var id = card.getAttribute("data-deal-id");
+      var tag = card.querySelector(".notified-tag");
+      var box = card.querySelector(".notify-box");
+      if (map[id]) {
+        tag.style.display = "inline-block";
+        tag.textContent = "已於 " + map[id].date + " 通知";
+        if (box) { box.checked = false; }
+      } else {
+        tag.style.display = "none";
+      }
+    });
+  }
+
+  function updateToolbar() {
+    var checked = document.querySelectorAll(".notify-box:checked");
+    var btn = document.getElementById("notifyBtn");
+    btn.textContent = "寄送提醒信（已勾選 " + checked.length + " 筆）";
+    btn.disabled = checked.length === 0;
+  }
+
+  function buildMailto(ownerEmail, ownerName, deals) {
+    var subject = "【階段提醒】" + ownerName + " 你有 " + deals.length + " 筆交易需要更新進度";
+    var lines = [ownerName + " 你好，", "",
+      "以下 " + deals.length + " 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：", ""];
+    deals.forEach(function (d) {
+      var daysTxt = (d.days === null || d.days === undefined) ? "天數未知" : ("已 " + d.days + " 個工作天");
+      lines.push("・" + d.name + "（" + d.stage + "，" + daysTxt + "，" + d.status + "）");
+    });
+    lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
+    var body = lines.join("\\n");
+    return "mailto:" + encodeURIComponent(ownerEmail) +
+      "?subject=" + encodeURIComponent(subject) +
+      "&body=" + encodeURIComponent(body);
+  }
+
+  function onSendClick() {
+    var checked = Array.prototype.slice.call(document.querySelectorAll(".notify-box:checked"));
+    if (checked.length === 0) return;
+
+    var groups = {};
+    checked.forEach(function (box) {
+      var card = box.closest(".deal-card");
+      var data = JSON.parse(card.getAttribute("data-deal"));
+      var key = data.email || data.owner;
+      if (!groups[key]) { groups[key] = { owner: data.owner, email: data.email, deals: [] }; }
+      groups[key].deals.push(data);
+    });
+
+    var map = loadNotified();
+    var keys = Object.keys(groups);
+    keys.forEach(function (key, idx) {
+      var g = groups[key];
+      if (!g.email) {
+        alert(g.owner + " 找不到 email，已略過，請手動聯絡。");
+        return;
+      }
+      var url = buildMailto(g.email, g.owner, g.deals);
+      setTimeout(function () { window.open(url, "_blank"); }, idx * 400);
+      g.deals.forEach(function (d) { map[d.id] = { date: todayStr() }; });
+    });
+    saveNotified(map);
+    paintNotified();
+    updateToolbar();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    paintNotified();
+    updateToolbar();
+    document.querySelectorAll(".notify-box").forEach(function (box) {
+      box.addEventListener("change", updateToolbar);
+    });
+    document.getElementById("notifyBtn").addEventListener("click", onSendClick);
+    document.getElementById("clearCheckBtn").addEventListener("click", function () {
+      document.querySelectorAll(".notify-box:checked").forEach(function (b) { b.checked = false; });
+      updateToolbar();
+    });
+    document.getElementById("clearNotifiedBtn").addEventListener("click", function () {
+      if (confirm("要清除這台瀏覽器裡記錄的「已通知」標記嗎？（只影響這台裝置，不影響實際資料）")) {
+        saveNotified({});
+        paintNotified();
+      }
+    });
+  });
+})();
+</script>'''
 
 
 def esc(s):
@@ -383,13 +495,24 @@ def render_html(records, generated_at):
                 urgency_cls = {0: "urgent-high", 1: "urgent-mid", 2: "urgent-low"}.get(
                     STATUS_PRIORITY.get(d["狀態"], 9), "urgent-none"
                 )
+                notify_payload = json.dumps({
+                    "id": d["id"],
+                    "name": d["交易名稱"] or "",
+                    "owner": d["業務"] or "",
+                    "email": d["業務Email"] or "",
+                    "stage": stage_tag,
+                    "days": d["工作天數"],
+                    "status": STATUS_LABEL[d["狀態"]],
+                }, ensure_ascii=False)
                 cards.append(f'''
-        <div class="deal-card {urgency_cls}">
+        <div class="deal-card {urgency_cls}" data-deal-id="{esc(d["id"])}" data-deal='{esc(notify_payload)}'>
           <div class="deal-head">
+            <label class="notify-check"><input type="checkbox" class="notify-box"><span></span></label>
             <span class="deal-name">{esc(d["交易名稱"])}</span>
             <span class="status-badge {STATUS_CLASS[d["狀態"]]}">{esc(STATUS_LABEL[d["狀態"]])}</span>
           </div>
           <div class="deal-date">階段：{esc(stage_tag)} ｜ 進入此階段：{esc((d["進入此階段時間"] or "")[:19].replace("T", " "))} ｜ 已 {esc(age_txt)}</div>
+          <div class="notified-tag" style="display:none"></div>
           <div class="deal-body">
             {rows_html}
           </div>
@@ -490,6 +613,18 @@ def render_html(records, generated_at):
   .fval{{color:var(--ink); word-break:break-word;}}
   .empty-note{{color:#9b9384; font-style:italic;}}
   .footer-note{{margin:24px 24px 0; font-size:12px; color:var(--muted); text-align:center;}}
+
+  .notify-toolbar{{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 24px 10px;
+    background:rgba(255,250,241,.92); border:1px solid var(--line); border-radius:16px; padding:12px 16px; box-shadow:var(--shadow);}}
+  .notify-toolbar button{{border:0; border-radius:999px; padding:9px 16px; font-weight:800; cursor:pointer; font-family:inherit; font-size:12.5px;}}
+  .notify-btn-primary{{background:var(--forest); color:#fff8ea;}}
+  .notify-btn-primary:disabled{{background:#c9c2b3; cursor:not-allowed;}}
+  .notify-btn-secondary{{background:#efe2c8; color:var(--forest);}}
+  .notify-count{{font-size:12.5px; color:var(--muted); margin-left:auto;}}
+  .notify-check{{display:inline-flex; align-items:center; margin-right:2px; cursor:pointer;}}
+  .notify-check input{{width:16px; height:16px; cursor:pointer; accent-color:var(--forest);}}
+  .notified-tag{{margin:2px 0 8px; font-size:11px; color:var(--forest); font-weight:700;
+    background:var(--moss-bg); border:1px solid var(--moss-bd); border-radius:999px; padding:2px 10px; display:inline-block;}}
 </style>
 </head>
 <body>
@@ -505,12 +640,19 @@ def render_html(records, generated_at):
   <div class="stat-box"><div class="num">{stage_counter.get("本月有機會",0)}</div><div class="lbl">本月有機會</div></div>
   <div class="stat-box"><div class="num">{escalate_count}</div><div class="lbl">已超過門檻，需優先處理</div></div>
 </div>
+<div class="notify-toolbar">
+  <button class="notify-btn-primary" id="notifyBtn" disabled>寄送提醒信（已勾選 0 筆）</button>
+  <button class="notify-btn-secondary" id="clearCheckBtn">清除勾選</button>
+  <button class="notify-btn-secondary" id="clearNotifiedBtn">清除本機已通知記錄</button>
+  <span class="notify-count" id="notifyHint">勾選交易卡片左上角的框，可以一次對多位不同業務寄出各自的提醒信（每人一封，只列出他自己被勾選的交易）。「已通知」標記只存在這台瀏覽器裡，換裝置不會同步。</span>
+</div>
 <div class="wrap">
   <div class="section-pad">
     {body_sections}
   </div>
   <div class="footer-note">工作天計算目前只排除週六、週日，尚未納入國定假日／補班日（v1）。資料來源：Zoho CRM Deals 模組，由 GitHub Actions 每日排程自動更新。</div>
 </div>
+''' + NOTIFY_SCRIPT + '''
 </body>
 </html>'''
 
