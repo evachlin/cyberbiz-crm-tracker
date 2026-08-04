@@ -6,75 +6,84 @@
 <title>CYBERBIZ 名單/交易階段自動追蹤</title>
 <style>
   :root{
-    --brand:#1B6EF3; --navy:#0F2447; --navy2:#16345F;
-    --ink:#0F172A; --sub:#5B6B82; --line:#E3E8F0; --bg:#F5F7FB; --card:#FFFFFF;
-    --gr:#059669; --gr-bg:#ECFDF5; --gr-bd:#A7F3D0;
-    --or:#D97706; --or-bg:#FFFBEB; --or-bd:#FDE68A;
-    --rd:#DC2626; --rd-bg:#FEF2F2; --rd-bd:#FECACA;
+    --ink:#17202a; --muted:#667085; --paper:#f7f2e8; --card:#fffaf1; --line:#dfd0ba;
+    --forest:#13523f; --forest2:#173d33; --moss:#6c8a48; --amber:#d58b25; --coral:#c95d3f; --sky:#336a8b;
+    --moss-bg:#eef3e4; --moss-bd:#cddbb4;
+    --amber-bg:#faf0da; --amber-bd:#eccf95;
+    --coral-bg:#fbe8e1; --coral-bd:#e6b7a4;
+    --shadow:0 20px 55px rgba(48,38,22,.14);
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font-family:"Microsoft JhengHei","Noto Sans TC",Calibri,Arial,sans-serif;line-height:1.6;}
+  body{margin:0;color:var(--ink);
+    font-family:Verdana,"Microsoft JhengHei","Noto Sans TC",Calibri,Arial,sans-serif;line-height:1.65;
+    background:
+      radial-gradient(circle at 14% 8%, rgba(213,139,37,.22), transparent 25%),
+      radial-gradient(circle at 85% 0%, rgba(19,82,63,.18), transparent 28%),
+      linear-gradient(135deg,#fbf3e4 0%,#efe1cc 62%,#e7d8bf 100%);
+  }
   .wrap{max-width:960px;margin:0 auto;padding:0 0 60px;}
-  .hero{background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 60%,var(--brand) 130%);
-    color:#fff;padding:34px 32px 28px;margin-bottom:26px;}
-  .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.14em;color:#9FC3FF;text-transform:uppercase;margin-bottom:10px;}
-  h1{margin:0 0 8px;font-size:22px;font-weight:800;}
-  .range{font-size:13px;color:#CFE0FF;}
-  .stat-line{margin-top:14px;font-size:12.5px;color:#CFE0FF;}
+  .hero{background:linear-gradient(150deg,var(--forest) 0%,var(--forest2) 58%,#24302b 100%);
+    color:#fff8ea;padding:34px 32px 28px;margin-bottom:26px; box-shadow:var(--shadow);}
+  .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.14em;color:#f5cf82;text-transform:uppercase;margin-bottom:10px;}
+  h1{margin:0 0 8px;font-size:22px;font-weight:800;letter-spacing:-.02em;}
+  .range{font-size:13px;color:#e6dcc4;}
+  .stat-line{margin-top:14px;font-size:12.5px;color:#e6dcc4;}
   .section-pad{padding:0 24px;}
   .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:18px 24px 6px;}
   @media (max-width:700px){ .stat-grid{grid-template-columns:repeat(2,1fr);} }
-  .stat-box{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; text-align:center;}
-  .stat-box .num{font-size:22px; font-weight:800; color:var(--brand);}
-  .stat-box .lbl{font-size:11.5px; color:var(--sub); margin-top:4px;}
-  details.team-block{background:var(--card); border:1px solid var(--brand); border-radius:12px; margin-bottom:16px; overflow:hidden;}
+  .stat-box{background:rgba(255,250,241,.92); border:1px solid var(--line); border-radius:16px; padding:14px 16px; text-align:center; box-shadow:var(--shadow);}
+  .stat-box .num{font-size:22px; font-weight:800; color:var(--forest);}
+  .stat-box .lbl{font-size:11.5px; color:var(--muted); margin-top:4px;}
+  details.team-block{background:var(--card); border:1px solid var(--line); border-radius:26px; margin-bottom:16px; overflow:hidden; box-shadow:var(--shadow);}
   details.team-block > summary{padding:16px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-    background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%); cursor:pointer; list-style:none; user-select:none;}
+    background:linear-gradient(150deg,var(--forest) 0%,var(--forest2) 100%); cursor:pointer; list-style:none; user-select:none;}
   details.team-block > summary::-webkit-details-marker{display:none;}
-  details.team-block > summary::before{content:"▾"; color:#fff; font-size:15px; transition:transform .15s; flex-shrink:0;}
+  details.team-block > summary::before{content:"▾"; color:#fff8ea; font-size:15px; transition:transform .15s; flex-shrink:0;}
   details.team-block:not([open]) > summary::before{ transform:rotate(-90deg); }
-  .team-name{font-weight:800; font-size:15.5px; color:#fff;}
-  .team-count{font-size:12px; color:#CFE0FF; margin-left:auto;}
+  .team-name{font-weight:800; font-size:15.5px; color:#fff8ea;}
+  .team-count{font-size:12px; color:#e6dcc4; margin-left:auto;}
   .team-owners{padding:14px 16px 4px;}
-  details.owner-block{background:#FBFCFE; border:1px solid var(--line); border-radius:10px; margin-bottom:10px; overflow:hidden;}
-  details.owner-block[open]{border-color:var(--brand);}
+  details.owner-block{background:#fffdf8; border:1px solid var(--line); border-radius:18px; margin-bottom:10px; overflow:hidden;}
+  details.owner-block[open]{border-color:var(--amber);}
   summary{list-style:none; cursor:pointer; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; user-select:none;}
   summary::-webkit-details-marker{display:none;}
-  summary::before{content:"▸"; color:var(--brand); font-size:13px; transition:transform .15s; flex-shrink:0;}
+  summary::before{content:"▸"; color:var(--forest); font-size:13px; transition:transform .15s; flex-shrink:0;}
   details[open] > summary::before{ transform:rotate(90deg); }
-  .owner-name{font-weight:800; font-size:14px; color:var(--navy);}
-  .owner-count{font-size:12px; color:var(--sub); margin-left:auto;}
+  .owner-name{font-weight:800; font-size:14px; color:var(--forest);}
+  .owner-count{font-size:12px; color:var(--muted); margin-left:auto;}
   .owner-deals{padding:0 14px 14px; display:grid; gap:10px;}
-  .deal-card{border:1px solid var(--line); border-radius:8px; padding:12px 14px; background:#fff;}
+  .deal-card{border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:#fffdf8; border-left:6px solid var(--line);}
+  .deal-card.urgent-high{border-left-color:var(--coral);}
+  .deal-card.urgent-mid{border-left-color:var(--amber);}
+  .deal-card.urgent-low{border-left-color:var(--moss);}
   .deal-head{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;}
   .deal-name{font-weight:700; font-size:13px; color:var(--ink); word-break:break-word;}
-  .deal-date{font-size:11.5px; color:var(--sub); margin-bottom:8px;}
+  .deal-date{font-size:11.5px; color:var(--muted); margin-bottom:8px;}
   .status-badge{font-size:11px; font-weight:700; padding:2px 10px; border-radius:999px; flex-shrink:0; white-space:nowrap;}
-  .st-new{background:var(--gr-bg); color:#047857; border:1px solid var(--gr-bd);}
-  .st-warn{background:var(--or-bg); color:#92610B; border:1px solid var(--or-bd);}
-  .st-danger{background:var(--rd-bg); color:#B91C1C; border:1px solid var(--rd-bd);}
-  .st-unknown{background:#F1F5F9; color:#64748B; border:1px solid var(--line);}
+  .st-new{background:var(--moss-bg); color:#3e5228; border:1px solid var(--moss-bd);}
+  .st-warn{background:var(--amber-bg); color:#8a5a12; border:1px solid var(--amber-bd);}
+  .st-danger{background:var(--coral-bg); color:#8a3820; border:1px solid var(--coral-bd);}
+  .st-unknown{background:#f1ede2; color:#7c7263; border:1px solid var(--line);}
   .deal-body{display:grid; gap:5px;}
   .frow{display:flex; gap:8px; font-size:12.5px; align-items:baseline;}
-  .flabel{flex-shrink:0; width:96px; color:var(--sub); font-weight:600;}
+  .flabel{flex-shrink:0; width:96px; color:var(--muted); font-weight:600;}
   .fval{color:var(--ink); word-break:break-word;}
-  .empty-note{color:#9CA3AF; font-style:italic;}
-  .footer-note{margin:24px 24px 0; font-size:12px; color:var(--sub); text-align:center;}
+  .empty-note{color:#9b9384; font-style:italic;}
+  .footer-note{margin:24px 24px 0; font-size:12px; color:var(--muted); text-align:center;}
 </style>
 </head>
 <body>
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
   <h1>公司名單 / 本月有機會 階段追蹤</h1>
-  <div class="range">依業務課分組｜公司名單規則：第 2/3 個工作天提醒／可轉派｜本月有機會規則：第 11/22 個工作天月中／月底檢核</div>
-  <div class="stat-line">共 239 筆（公司名單 189 筆、本月有機會 50 筆）｜每日自動更新，最後更新：2026-08-04 17:03 (UTC+8)</div>
+  <div class="range">依業務課分組（一課～四課＋POS）｜同一位業務底下依緊急程度排序｜公司名單規則：第 2/3 個工作天提醒／可轉派｜本月有機會規則：第 11/22 個工作天月中／月底檢核</div>
+  <div class="stat-line">共 237 筆（公司名單 187 筆、本月有機會 50 筆）｜每日自動更新，最後更新：2026-08-04 17:27 (UTC+8)</div>
 </div>
 <div class="stat-grid">
-  <div class="stat-box"><div class="num">239</div><div class="lbl">追蹤中總筆數</div></div>
-  <div class="stat-box"><div class="num">189</div><div class="lbl">公司名單</div></div>
+  <div class="stat-box"><div class="num">237</div><div class="lbl">追蹤中總筆數</div></div>
+  <div class="stat-box"><div class="num">187</div><div class="lbl">公司名單</div></div>
   <div class="stat-box"><div class="num">50</div><div class="lbl">本月有機會</div></div>
-  <div class="stat-box"><div class="num">181</div><div class="lbl">已超過門檻，需優先處理</div></div>
+  <div class="stat-box"><div class="num">177</div><div class="lbl">已超過門檻，需優先處理</div></div>
 </div>
 <div class="wrap">
   <div class="section-pad">
@@ -82,7 +91,7 @@
     <details class="team-block" open>
       <summary>
         <span class="team-name">業務一課</span>
-        <span class="team-count">4 位業務　·　共 29 筆　·　18 筆需優先處理</span>
+        <span class="team-count">4 位業務　·　共 30 筆　·　18 筆需優先處理</span>
       </summary>
       <div class="team-owners">
         
@@ -93,7 +102,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#20251017論壇_再造商業版圖#行銷匯入#酷柏國際美妝有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -104,7 +113,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#舊客介紹 # 長弓貿易有限公司 #長工弦舞</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -115,7 +124,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar#新傅尚品國際有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -127,7 +136,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#手作余先生 #ponpon20260320</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -138,7 +147,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar#W SPA寵物旅館</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -150,7 +159,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#ec#阿布潘水產</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -161,7 +170,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pricing#庚源國際商行(墨町好食)</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -172,7 +181,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#塔塔曼尼有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -183,7 +192,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#饅頭圓圓商行</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -203,7 +212,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#速沛優#鴻遠實業股份有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -215,29 +224,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店顧問聯繫我#沐宸</span>
-            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
-          </div>
-          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-11 10:17:04 ｜ 已 16 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店顧問聯繫我#contact_AI#安安醫療儀器行</span>
-            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
-          </div>
-          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-12 20:55:25 ｜ 已 16 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#人本森機世界商行</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -249,7 +236,29 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
+          <div class="deal-head">
+            <span class="deal-name">#開店顧問聯繫我#沐宸</span>
+            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
+          </div>
+          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-11 10:17:04 ｜ 已 16 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-mid">
+          <div class="deal-head">
+            <span class="deal-name">#開店顧問聯繫我#contact_AI#安安醫療儀器行</span>
+            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
+          </div>
+          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-12 20:55:25 ｜ 已 16 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#livhub</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -260,7 +269,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#食色</span>
             <span class="status-badge st-new">新名單</span>
@@ -276,11 +285,11 @@
       <details class="owner-block">
         <summary>
           <span class="owner-name">Sarah Lin</span>
-          <span class="owner-count">共 12 筆</span>
+          <span class="owner-count">共 13 筆</span>
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#FM&amp;Carol CASHMERE</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -293,7 +302,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#776</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -304,7 +313,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#耀瑩國際有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -315,7 +324,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pricing#ONEV</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -328,18 +337,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">陌開 得意中華</span>
-            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
-          </div>
-          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-14 10:53:42 ｜ 已 15 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">名單來源</span><span class="fval">陌開</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#花見服飾</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -351,18 +349,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店顧問聯繫我#pricing#cloche</span>
-            <span class="status-badge st-new">追蹤中</span>
-          </div>
-          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-30 03:01:00 ｜ 已 3 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#Vic</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -374,7 +361,18 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
+          <div class="deal-head">
+            <span class="deal-name">陌開 得意中華</span>
+            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
+          </div>
+          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-14 10:53:42 ｜ 已 15 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">名單來源</span><span class="fval">陌開</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#環球創客數位工坊</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -386,7 +384,18 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
+          <div class="deal-head">
+            <span class="deal-name">#開店顧問聯繫我#pricing#cloche</span>
+            <span class="status-badge st-new">追蹤中</span>
+          </div>
+          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-30 03:01:00 ｜ 已 3 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#九龍齌</span>
             <span class="status-badge st-new">新名單</span>
@@ -398,7 +407,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar#Lily Yanagi</span>
             <span class="status-badge st-new">新名單</span>
@@ -410,7 +419,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#建興企業社</span>
             <span class="status-badge st-new">新名單</span>
@@ -418,6 +427,18 @@
           <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-04 14:00:07 ｜ 已 0 個工作天</div>
           <div class="deal-body">
             <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-low">
+          <div class="deal-head">
+            <span class="deal-name">#開店研討會#0812_channelbridge#昌豐國際股份有限公司</span>
+            <span class="status-badge st-new">新名單</span>
+          </div>
+          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-04 17:10:58 ｜ 已 0 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">商品類別</span><span class="fval">保健</span></div>
+<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店研討會</span></div>
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
@@ -430,7 +451,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#敦義五金股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -442,7 +463,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#松己生技</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -462,18 +483,18 @@
     <details class="team-block" open>
       <summary>
         <span class="team-name">業務二課</span>
-        <span class="team-count">3 位業務　·　共 20 筆　·　8 筆需優先處理</span>
+        <span class="team-count">3 位業務　·　共 19 筆　·　8 筆需優先處理</span>
       </summary>
       <div class="team-owners">
         
       <details class="owner-block">
         <summary>
           <span class="owner-name">Andy Zhuang</span>
-          <span class="owner-count">共 9 筆</span>
+          <span class="owner-count">共 8 筆</span>
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#康泰創意股份有限公司#Lumis 織光</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -484,7 +505,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#邁爾有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -495,7 +516,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#億承國際企業社</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -506,7 +527,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#愛你們國際事業有限公司</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -517,7 +538,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#森日作有限公司#Kingmauii 金茂宜咖啡</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -528,7 +549,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">FB#LINE#IG#威振貿易有限公司</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -539,19 +560,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店研討會#0812_channelbridge#無</span>
-            <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
-          </div>
-          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-07-31 07:06:00 ｜ 已 2 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">商品類別</span><span class="fval">衣鞋服飾</span></div>
-<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店研討會</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#櫥窗針織藝品坊</span>
             <span class="status-badge st-new">新名單</span>
@@ -563,7 +572,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#seminar#陸廣實業有限公司</span>
             <span class="status-badge st-new">新名單</span>
@@ -583,7 +592,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#anher</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -594,7 +603,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pricing#幸福巷食品</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -605,7 +614,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">FB#LINE#IG#CLOVI衣萊服飾行</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -616,7 +625,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#玩具公仔#陳翰賢</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -627,7 +636,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#綠金寶</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -638,7 +647,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#舊客介紹#玥玥</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -649,7 +658,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar#菇購生鮮</span>
             <span class="status-badge st-new">新名單</span>
@@ -670,7 +679,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#松益製香</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -681,7 +690,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#競界企業社</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -692,7 +701,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#ec#耀進步企業社</span>
             <span class="status-badge st-new">新名單</span>
@@ -703,7 +712,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#宸宸企業社</span>
             <span class="status-badge st-new">追蹤中</span>
@@ -725,18 +734,18 @@
     <details class="team-block" open>
       <summary>
         <span class="team-name">業務三課</span>
-        <span class="team-count">4 位業務　·　共 20 筆　·　9 筆需優先處理</span>
+        <span class="team-count">4 位業務　·　共 17 筆　·　5 筆需優先處理</span>
       </summary>
       <div class="team-owners">
         
       <details class="owner-block">
         <summary>
           <span class="owner-name">Allen YK Chen</span>
-          <span class="owner-count">共 4 筆</span>
+          <span class="owner-count">共 5 筆</span>
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#艾品共創國際股份有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -748,7 +757,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#良陳集市網絡有限公司</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -759,7 +768,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#珍穀王商行</span>
             <span class="status-badge st-new">新名單</span>
@@ -771,7 +780,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#槿嶸服飾</span>
             <span class="status-badge st-new">新名單</span>
@@ -779,6 +788,18 @@
           <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-04 15:06:34 ｜ 已 0 個工作天</div>
           <div class="deal-body">
             <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-low">
+          <div class="deal-head">
+            <span class="deal-name">#開店研討會#0812_channelbridge#謝文松</span>
+            <span class="status-badge st-new">新名單</span>
+          </div>
+          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-04 17:25:51 ｜ 已 0 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">商品類別</span><span class="fval">寵物用品</span></div>
+<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店研討會</span></div>
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
@@ -791,7 +812,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#discount#嬰之房有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -803,7 +824,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#品豪科技有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -815,7 +836,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#蝦皮</span>
             <span class="status-badge st-new">新名單</span>
@@ -835,7 +856,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#酷博士國際有限公司 玩酷子弟</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -847,7 +868,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#yiyunbio</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -858,7 +879,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#露露</span>
             <span class="status-badge st-new">新名單</span>
@@ -870,7 +891,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#欣春媒體製作有限公司</span>
             <span class="status-badge st-new">新名單</span>
@@ -887,11 +908,11 @@
       <details class="owner-block">
         <summary>
           <span class="owner-name">Shelly Wang</span>
-          <span class="owner-count">共 9 筆</span>
+          <span class="owner-count">共 5 筆</span>
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#industry_beauty#燊禾商行</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -903,7 +924,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pricing#未定</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -915,7 +936,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact_AI#珍氏美</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -927,7 +948,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#OMO#原醫集團</span>
             <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
@@ -939,7 +960,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#陌開 #全鋒汽車</span>
             <span class="status-badge st-new">追蹤中</span>
@@ -948,53 +969,6 @@
           <div class="deal-body">
             <div class="frow"><span class="flabel">金額</span><span class="fval">NT$ 64,800</span></div>
 <div class="frow"><span class="flabel">名單來源</span><span class="fval">陌開</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店研討會#0812_channelbridge#QQ熊</span>
-            <span class="status-badge st-danger">可轉派（≥3工作天）</span>
-          </div>
-          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-07-28 07:15:25 ｜ 已 5 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">商品類別</span><span class="fval">衣鞋服飾</span></div>
-<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店研討會</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店研討會#0812_channelbridge#旺錸商城</span>
-            <span class="status-badge st-danger">可轉派（≥3工作天）</span>
-          </div>
-          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-07-29 00:46:11 ｜ 已 4 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">商品類別</span><span class="fval">保健</span></div>
-<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店研討會</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店研討會#0812_channelbridge#上亞</span>
-            <span class="status-badge st-danger">可轉派（≥3工作天）</span>
-          </div>
-          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-07-29 07:45:03 ｜ 已 4 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">商品類別</span><span class="fval">美妝</span></div>
-<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店研討會</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店顧問聯繫我#contact#峰漁</span>
-            <span class="status-badge st-danger">可轉派（≥3工作天）</span>
-          </div>
-          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-07-30 10:06:54 ｜ 已 3 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
@@ -1017,7 +991,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#精戰</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1028,7 +1002,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact_google#薇閣餐旅股份有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -1040,7 +1014,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#industry_homelife#旭誠科技有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1051,7 +1025,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#Emma</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1063,7 +1037,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#林全興</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1075,7 +1049,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#吳宏真</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1087,7 +1061,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">FB#LINE#IG#三協順水產有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1098,7 +1072,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#穎灃企業有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1110,7 +1084,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#ec#青山貿易有限公司</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -1121,7 +1095,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#泓華股份有限公司</span>
             <span class="status-badge st-new">新名單</span>
@@ -1132,7 +1106,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#東旺利</span>
             <span class="status-badge st-new">新名單</span>
@@ -1144,7 +1118,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#industry_fandb#果珍精品水果</span>
             <span class="status-badge st-new">新名單</span>
@@ -1155,7 +1129,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#gina#buthenu</span>
             <span class="status-badge st-new">新名單</span>
@@ -1166,12 +1140,12 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
-            <span class="deal-name">#開店顧問聯繫我#contact#小種子生活選物</span>
+            <span class="deal-name">#開店顧問聯繫我#contact#富麗村有限公司</span>
             <span class="status-badge st-new">新名單</span>
           </div>
-          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-04 12:58:14 ｜ 已 0 個工作天</div>
+          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-04 17:06:35 ｜ 已 0 個工作天</div>
           <div class="deal-body">
             <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
@@ -1186,7 +1160,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#陌開 #joto #九土企業社</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1197,7 +1171,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#名流精品寢具生活館</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1208,7 +1182,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pricing#亮顏生醫有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -1220,7 +1194,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#cheershualien</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -1231,7 +1205,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#珈大業大工作室</span>
             <span class="status-badge st-new">追蹤中</span>
@@ -1242,7 +1216,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#Sakura有機農場</span>
             <span class="status-badge st-new">追蹤中</span>
@@ -1253,7 +1227,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#supercute</span>
             <span class="status-badge st-new">新名單</span>
@@ -1264,7 +1238,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#yukihaku2025</span>
             <span class="status-badge st-new">新名單</span>
@@ -1284,7 +1258,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pricing#樺山玩具有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -1296,7 +1270,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#馥漫麵包花園</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -1316,7 +1290,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar# 現代花藝農場</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1328,7 +1302,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#showcase#生資有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -1340,31 +1314,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店顧問聯繫我#contact#石蘊美學有限公司</span>
-            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
-          </div>
-          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-09 10:33:36 ｜ 已 18 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">金額</span><span class="fval">NT$ 180,000</span></div>
-<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
-          <div class="deal-head">
-            <span class="deal-name">#開店顧問聯繫我#discount#曉島生醫股份有限公司</span>
-            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
-          </div>
-          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-20 17:00:35 ｜ 已 11 個工作天</div>
-          <div class="deal-body">
-            <div class="frow"><span class="flabel">金額</span><span class="fval">NT$ 120,000</span></div>
-<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
-<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
-          </div>
-        </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#展勝</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1376,7 +1326,31 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
+          <div class="deal-head">
+            <span class="deal-name">#開店顧問聯繫我#contact#石蘊美學有限公司</span>
+            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
+          </div>
+          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-09 10:33:36 ｜ 已 18 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">金額</span><span class="fval">NT$ 180,000</span></div>
+<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-mid">
+          <div class="deal-head">
+            <span class="deal-name">#開店顧問聯繫我#discount#曉島生醫股份有限公司</span>
+            <span class="status-badge st-warn">月中檢核（≥11工作天）</span>
+          </div>
+          <div class="deal-date">階段：本月有機會 ｜ 進入此階段：2026-07-20 17:00:35 ｜ 已 11 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">金額</span><span class="fval">NT$ 120,000</span></div>
+<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#綠園牧場股份有限公司</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -1388,7 +1362,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#美立購物</span>
             <span class="status-badge st-new">新名單</span>
@@ -1419,7 +1393,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#POS研討會#pos_discount#陸廣實業有限公司</span>
             <span class="status-badge st-new">新名單</span>
@@ -1440,7 +1414,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#意水軒農產企業社</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1452,7 +1426,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#POS研討會#pos_google#騰伶國際有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -1474,7 +1448,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pos#富慶有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1485,7 +1459,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#POS研討會#pos_google#初名娛樂有限公司</span>
             <span class="status-badge st-new">新名單</span>
@@ -1505,7 +1479,7 @@
     <details class="team-block" open>
       <summary>
         <span class="team-name">其他(非本次組織名單內)</span>
-        <span class="team-count">11 位業務　·　共 134 筆　·　126 筆需優先處理</span>
+        <span class="team-count">11 位業務　·　共 135 筆　·　126 筆需優先處理</span>
       </summary>
       <div class="team-owners">
         
@@ -1516,7 +1490,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#POS講座#0720 Webinar</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1528,7 +1502,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#POS講座#0723 webinar</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1540,7 +1514,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#POS研討會#0723 seminar</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1561,7 +1535,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#20251017論壇_再造商業版圖#行銷匯入#長榮航空</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1572,7 +1546,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#global#先柏油漆廠有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1583,7 +1557,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#ENT#中華電信#TOP20# LACOSTE_台灣拉克絲蒂股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1594,7 +1568,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#global#高雄市仁武區仁光路65號</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1605,7 +1579,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#123</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1617,7 +1591,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#ㄉˇ</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1628,7 +1602,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#1234</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1640,7 +1614,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#global#奇妮國際有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1660,7 +1634,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#安伯特有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1671,7 +1645,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">玩具反斗城 #20</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1682,7 +1656,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#得力嚴選</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1693,7 +1667,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">CASPACE</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1705,7 +1679,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact_meta#Funky boy</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1717,7 +1691,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#時哲企業有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1728,7 +1702,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#壹康生物科技股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1739,7 +1713,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Rainforet Life｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1751,7 +1725,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">揚臻國際有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1763,7 +1737,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">DEVILCASE COMPANY LIMITED｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1775,7 +1749,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">資策會｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1787,7 +1761,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">果利生技｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1799,7 +1773,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">百利世貿易有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1811,7 +1785,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">龍鉅超潔淨科技(蘇州)有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1823,7 +1797,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">愛烙達股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1835,7 +1809,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">芃芃貿易有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1847,7 +1821,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">益麟企業有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1859,7 +1833,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">美福貿易股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1871,7 +1845,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">星歐光學股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1883,7 +1857,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">星研美創股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1895,7 +1869,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">森宏生技｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1907,7 +1881,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">台灣寶樂股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1919,7 +1893,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">倚天酷碁股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1931,7 +1905,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">新蛋股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1943,7 +1917,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">榕佑國際有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1955,7 +1929,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">霈米科技有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1967,7 +1941,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">路美創作有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1979,7 +1953,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">華碩電腦｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -1991,7 +1965,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">日本無印良品團購</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2002,7 +1976,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#gl-pricing#樂芙夏國際有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2013,7 +1987,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar#永義房屋</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2025,7 +1999,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#global_my#飛鵝數位電訊有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2036,7 +2010,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#global#鴻鼎廚具。</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2047,7 +2021,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#宜得利家居股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2059,7 +2033,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">宜得利</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2072,7 +2046,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#跨境電商諮詢#global_jp#香港商旭昶香港有限公司台灣分公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2083,7 +2057,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar#是方電訊股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2095,7 +2069,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#RATHER</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2106,7 +2080,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#Keraia</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2127,7 +2101,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#seminar#悠活原力</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2148,7 +2122,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact_google#炳國有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2159,7 +2133,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#F131215037</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -2179,7 +2153,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0708_rankking#Gavin Chang</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2200,7 +2174,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">NEW ERA #20</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2211,7 +2185,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">MLB #20</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2222,7 +2196,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#陌開 #雅方國際企業股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2233,7 +2207,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0429_cresclab#聯合利華高端產品事業股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2245,7 +2219,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">康揚股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2257,7 +2231,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">揚臻國際有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2269,7 +2243,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">鑫鼎全球有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2281,7 +2255,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">廣笙國際股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2293,7 +2267,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">成星貿易有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2305,7 +2279,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">MotivAd 謀其廣告股份有限供司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2317,7 +2291,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">玩玩創意工作室｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2329,7 +2303,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">柏楷物流商行｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2341,7 +2315,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">亞洲橙國際有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2353,7 +2327,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">惠而強實業股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2365,7 +2339,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Wistron｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2377,7 +2351,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">轉職中（現為北商大跨境電商產業碩士專班碩二生）｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2389,7 +2363,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">賜鴻科技有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2401,7 +2375,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">圈圈馬洋行｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2413,7 +2387,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Mowi Taiwan｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2425,7 +2399,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">達樂星｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2437,7 +2411,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">星展銀行｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2449,7 +2423,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">武昌貿易有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2461,7 +2435,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">即時國際商務有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2473,7 +2447,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">崧裕國際有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2485,7 +2459,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">飛比特國際股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2497,7 +2471,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">書香關懷協會｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2509,7 +2483,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">大誠國際貿易有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2521,7 +2495,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Insider One｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2533,7 +2507,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">躍崠有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2545,7 +2519,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Acheloi SRL｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2557,7 +2531,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">品碩創新管理顧問有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2569,7 +2543,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">佳鈞小吃店 (麵享享)｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2581,7 +2555,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">大地母親姿儀股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2593,7 +2567,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">大地母親姿儀股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2605,7 +2579,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">歐旻企業股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2617,7 +2591,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">商線科技｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2629,7 +2603,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">好好國際物流股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2641,7 +2615,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">.｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2653,7 +2627,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">善恩創新股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2665,7 +2639,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">上洋產業股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2677,7 +2651,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">廣協有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2689,7 +2663,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">蘭曜國際有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2701,7 +2675,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">BQool｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2713,7 +2687,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#purelight</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2724,7 +2698,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#global#奇妮國際有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2744,7 +2718,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#經銷轉介#幼水幼亮股份有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -2756,7 +2730,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#陌生開發#瀾漫選物部</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -2768,7 +2742,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">水氣陽光有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2780,7 +2754,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">美亞｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2792,7 +2766,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">雲巖科技股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2804,7 +2778,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">崧暄有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2816,7 +2790,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">奇郁國際股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2828,7 +2802,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">和潤國際有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2840,7 +2814,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">耀森股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2852,7 +2826,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Chengxin Co.｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2864,7 +2838,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">祥宇有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2876,7 +2850,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">裕富嘉實業有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2888,7 +2862,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Omnichat 全通路科技有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2900,7 +2874,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Isobar｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2912,7 +2886,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">久揚｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2924,7 +2898,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">麗京開發股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2936,7 +2910,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">冠珽工業社｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2948,7 +2922,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">台灣雅典娜智慧科技有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2960,7 +2934,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">Viking Pinball｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2972,7 +2946,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">亞洲生技館科技股份有限公司｜IEAT 0429 跨境電商講座</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -2984,7 +2958,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#pricing#旭瞳股份有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -3000,11 +2974,11 @@
       <details class="owner-block">
         <summary>
           <span class="owner-name">Sabrina Hua</span>
-          <span class="owner-count">共 5 筆</span>
+          <span class="owner-count">共 6 筆</span>
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#homepage#齊謀媒體行銷有限公司</span>
             <span class="status-badge st-danger">月底檢核（≥22工作天）</span>
@@ -3015,7 +2989,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#indo</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -3026,7 +3000,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#博大畫廊</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -3037,7 +3011,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#樺拾光國際有限公司</span>
             <span class="status-badge st-new">新名單</span>
@@ -3049,7 +3023,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#凱第雅</span>
             <span class="status-badge st-new">新名單</span>
@@ -3057,6 +3031,18 @@
           <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-02 23:15:16 ｜ 已 1 個工作天</div>
           <div class="deal-body">
             <div class="frow"><span class="flabel">名單來源</span><span class="fval">開店顧問聯繫我</span></div>
+<div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
+          </div>
+        </div>
+        <div class="deal-card urgent-low">
+          <div class="deal-head">
+            <span class="deal-name">#開店研討會#0812_channelbridge#昌豐國際股份有限公司</span>
+            <span class="status-badge st-new">新名單</span>
+          </div>
+          <div class="deal-date">階段：公司名單 ｜ 進入此階段：2026-08-04 17:12:31 ｜ 已 0 個工作天</div>
+          <div class="deal-body">
+            <div class="frow"><span class="flabel">商品類別</span><span class="fval">衣鞋服飾</span></div>
+<div class="frow"><span class="flabel">名單來源</span><span class="fval">開店研討會</span></div>
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
@@ -3069,7 +3055,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#wms#至宏國際有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -3080,7 +3066,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact_meta#韓維利</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -3091,7 +3077,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#industry_health#緹森生醫科研有限公司</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -3102,7 +3088,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-high">
           <div class="deal-head">
             <span class="deal-name">#開店顧問聯繫我#contact#永三企業</span>
             <span class="status-badge st-danger">可轉派（≥3工作天）</span>
@@ -3113,7 +3099,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#電商倉儲#wms#順一有限公司/保華名品有限公司</span>
             <span class="status-badge st-new">新名單</span>
@@ -3134,7 +3120,7 @@
         </summary>
         <div class="owner-deals">
           
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#龍鳳國際貿易有限公司</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -3146,7 +3132,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-mid">
           <div class="deal-head">
             <span class="deal-name">#商家註冊#trial#baifeng1981</span>
             <span class="status-badge st-warn">提醒判斷（≥2工作天）</span>
@@ -3157,7 +3143,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#學學創意設計百貨舖</span>
             <span class="status-badge st-new">新名單</span>
@@ -3169,7 +3155,7 @@
 <div class="frow"><span class="flabel">備註</span><span class="fval">建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算</span></div>
           </div>
         </div>
-        <div class="deal-card">
+        <div class="deal-card urgent-low">
           <div class="deal-head">
             <span class="deal-name">#開店研討會#0812_channelbridge#新拾尚國際股份有限公司</span>
             <span class="status-badge st-new">新名單</span>
