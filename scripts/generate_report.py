@@ -71,6 +71,7 @@ ROSTER = {
 TEAM_ORDER = ["業務一課", "業務二課", "業務三課", "業務四課", "POS", "其他(非本次組織名單內)"]
 
 STAGES_TRACKED = ["公司名單", "本月有機會"]
+TRACK_SINCE = "2026-01-01T00:00:00+08:00"  # 只追蹤這個日期之後建立的交易，避免把歷史上所有卡在這兩階段的舊資料全抓進來
 
 # 規則門檻（工作天，只排除週六週日，尚未納入國定假日 —— 之後要補請看 README）
 COMPANY_LIST_REMIND_DAY = 2      # 第 2 個工作天：提醒判斷有效/無效
@@ -211,7 +212,8 @@ def fetch_current_deals(token):
     query = (
         "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, "
         "Stage, Created_Time, Modified_Time, Amount, Closing_Date, product_type, visitor_source "
-        f"FROM Deals WHERE Stage in ({stages_sql}) ORDER BY Created_Time ASC"
+        f"FROM Deals WHERE (Stage in ({stages_sql})) AND (Created_Time >= '{TRACK_SINCE}') "
+        "ORDER BY Created_Time ASC"
     )
     return coql_query(token, query)
 
