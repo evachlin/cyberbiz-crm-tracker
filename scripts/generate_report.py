@@ -432,7 +432,13 @@ NOTIFY_SCRIPT = '''<script>
         return;
       }
       var url = buildMailto(g.email, g.owner, g.deals);
-      setTimeout(function () { window.open(url, "_blank"); }, idx * 400);
+      // 直接同步開啟（不要用 setTimeout 延遲），才能保留「這是使用者剛剛點擊」的狀態，
+      // 否則瀏覽器會判斷不出這是使用者操作，導致開出一片空白、也不會跳出用哪個信箱開的詢問視窗。
+      if (idx === 0) {
+        window.location.href = url;
+      } else {
+        window.open(url, "_blank");
+      }
       g.deals.forEach(function (d) {
         map[d.id] = {
           date: todayStr(), ts: Date.now(),
