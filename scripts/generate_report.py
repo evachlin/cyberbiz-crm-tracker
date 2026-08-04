@@ -314,6 +314,13 @@ STATUS_CLASS = {
     "tracking": "st-new", "midcheck": "st-warn", "endcheck": "st-danger",
     "unknown": "st-unknown",
 }
+# 卡片排序用的緊急程度：數字越小越緊急，排最前面。同一層再依工作天數從多到少排。
+STATUS_PRIORITY = {
+    "escalate": 0, "endcheck": 0,
+    "remind": 1, "midcheck": 1,
+    "new": 2, "tracking": 2,
+    "unknown": 3,
+}
 
 
 def esc(s):
@@ -348,7 +355,14 @@ def render_html(records, generated_at):
 
         owner_blocks = []
         for owner in owners_sorted:
-            deals = sorted(owners[owner], key=lambda r: r["工作天數"] if r["工作天數"] is not None else -1, reverse=True)
+            # 先依「緊急程度」排（可轉派／月底檢核最前面），同緊急程度內再依工作天數從多到少排
+            deals = sorted(
+                owners[owner],
+                key=lambda r: (
+                    STATUS_PRIORITY.get(r["狀態"], 9),
+                    -(r["工作天數"] if r["工作天數"] is not None else -1),
+                ),
+            )
             cards = []
             for d in deals:
                 rows = []
@@ -366,8 +380,11 @@ def render_html(records, generated_at):
                 rows_html = "\n".join(rows) if rows else '<div class="frow empty-note">其餘欄位皆未填寫</div>'
                 age_txt = f'{d["工作天數"]} 個工作天' if d["工作天數"] is not None else "天數未知"
                 stage_tag = "公司名單" if d["Stage"] == "公司名單" else "本月有機會"
+                urgency_cls = {0: "urgent-high", 1: "urgent-mid", 2: "urgent-low"}.get(
+                    STATUS_PRIORITY.get(d["狀態"], 9), "urgent-none"
+                )
                 cards.append(f'''
-        <div class="deal-card">
+        <div class="deal-card {urgency_cls}">
           <div class="deal-head">
             <span class="deal-name">{esc(d["交易名稱"])}</span>
             <span class="status-badge {STATUS_CLASS[d["狀態"]]}">{esc(STATUS_LABEL[d["狀態"]])}</span>
@@ -409,68 +426,77 @@ def render_html(records, generated_at):
 <title>CYBERBIZ 名單/交易階段自動追蹤</title>
 <style>
   :root{{
-    --brand:#1B6EF3; --navy:#0F2447; --navy2:#16345F;
-    --ink:#0F172A; --sub:#5B6B82; --line:#E3E8F0; --bg:#F5F7FB; --card:#FFFFFF;
-    --gr:#059669; --gr-bg:#ECFDF5; --gr-bd:#A7F3D0;
-    --or:#D97706; --or-bg:#FFFBEB; --or-bd:#FDE68A;
-    --rd:#DC2626; --rd-bg:#FEF2F2; --rd-bd:#FECACA;
+    --ink:#17202a; --muted:#667085; --paper:#f7f2e8; --card:#fffaf1; --line:#dfd0ba;
+    --forest:#13523f; --forest2:#173d33; --moss:#6c8a48; --amber:#d58b25; --coral:#c95d3f; --sky:#336a8b;
+    --moss-bg:#eef3e4; --moss-bd:#cddbb4;
+    --amber-bg:#faf0da; --amber-bd:#eccf95;
+    --coral-bg:#fbe8e1; --coral-bd:#e6b7a4;
+    --shadow:0 20px 55px rgba(48,38,22,.14);
   }}
   *{{box-sizing:border-box;}}
-  body{{margin:0;background:var(--bg);color:var(--ink);
-    font-family:"Microsoft JhengHei","Noto Sans TC",Calibri,Arial,sans-serif;line-height:1.6;}}
+  body{{margin:0;color:var(--ink);
+    font-family:Verdana,"Microsoft JhengHei","Noto Sans TC",Calibri,Arial,sans-serif;line-height:1.65;
+    background:
+      radial-gradient(circle at 14% 8%, rgba(213,139,37,.22), transparent 25%),
+      radial-gradient(circle at 85% 0%, rgba(19,82,63,.18), transparent 28%),
+      linear-gradient(135deg,#fbf3e4 0%,#efe1cc 62%,#e7d8bf 100%);
+  }}
   .wrap{{max-width:960px;margin:0 auto;padding:0 0 60px;}}
-  .hero{{background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 60%,var(--brand) 130%);
-    color:#fff;padding:34px 32px 28px;margin-bottom:26px;}}
-  .eyebrow{{font-size:12.5px;font-weight:800;letter-spacing:.14em;color:#9FC3FF;text-transform:uppercase;margin-bottom:10px;}}
-  h1{{margin:0 0 8px;font-size:22px;font-weight:800;}}
-  .range{{font-size:13px;color:#CFE0FF;}}
-  .stat-line{{margin-top:14px;font-size:12.5px;color:#CFE0FF;}}
+  .hero{{background:linear-gradient(150deg,var(--forest) 0%,var(--forest2) 58%,#24302b 100%);
+    color:#fff8ea;padding:34px 32px 28px;margin-bottom:26px; box-shadow:var(--shadow);}}
+  .eyebrow{{font-size:12.5px;font-weight:800;letter-spacing:.14em;color:#f5cf82;text-transform:uppercase;margin-bottom:10px;}}
+  h1{{margin:0 0 8px;font-size:22px;font-weight:800;letter-spacing:-.02em;}}
+  .range{{font-size:13px;color:#e6dcc4;}}
+  .stat-line{{margin-top:14px;font-size:12.5px;color:#e6dcc4;}}
   .section-pad{{padding:0 24px;}}
   .stat-grid{{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:18px 24px 6px;}}
   @media (max-width:700px){{ .stat-grid{{grid-template-columns:repeat(2,1fr);}} }}
-  .stat-box{{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; text-align:center;}}
-  .stat-box .num{{font-size:22px; font-weight:800; color:var(--brand);}}
-  .stat-box .lbl{{font-size:11.5px; color:var(--sub); margin-top:4px;}}
-  details.team-block{{background:var(--card); border:1px solid var(--brand); border-radius:12px; margin-bottom:16px; overflow:hidden;}}
+  .stat-box{{background:rgba(255,250,241,.92); border:1px solid var(--line); border-radius:16px; padding:14px 16px; text-align:center; box-shadow:var(--shadow);}}
+  .stat-box .num{{font-size:22px; font-weight:800; color:var(--forest);}}
+  .stat-box .lbl{{font-size:11.5px; color:var(--muted); margin-top:4px;}}
+  details.team-block{{background:var(--card); border:1px solid var(--line); border-radius:26px; margin-bottom:16px; overflow:hidden; box-shadow:var(--shadow);}}
   details.team-block > summary{{padding:16px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-    background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%); cursor:pointer; list-style:none; user-select:none;}}
+    background:linear-gradient(150deg,var(--forest) 0%,var(--forest2) 100%); cursor:pointer; list-style:none; user-select:none;}}
   details.team-block > summary::-webkit-details-marker{{display:none;}}
-  details.team-block > summary::before{{content:"▾"; color:#fff; font-size:15px; transition:transform .15s; flex-shrink:0;}}
+  details.team-block > summary::before{{content:"▾"; color:#fff8ea; font-size:15px; transition:transform .15s; flex-shrink:0;}}
   details.team-block:not([open]) > summary::before{{ transform:rotate(-90deg); }}
-  .team-name{{font-weight:800; font-size:15.5px; color:#fff;}}
-  .team-count{{font-size:12px; color:#CFE0FF; margin-left:auto;}}
+  .team-name{{font-weight:800; font-size:15.5px; color:#fff8ea;}}
+  .team-count{{font-size:12px; color:#e6dcc4; margin-left:auto;}}
   .team-owners{{padding:14px 16px 4px;}}
-  details.owner-block{{background:#FBFCFE; border:1px solid var(--line); border-radius:10px; margin-bottom:10px; overflow:hidden;}}
-  details.owner-block[open]{{border-color:var(--brand);}}
+  details.owner-block{{background:#fffdf8; border:1px solid var(--line); border-radius:18px; margin-bottom:10px; overflow:hidden;}}
+  details.owner-block[open]{{border-color:var(--amber);}}
   summary{{list-style:none; cursor:pointer; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; user-select:none;}}
   summary::-webkit-details-marker{{display:none;}}
-  summary::before{{content:"▸"; color:var(--brand); font-size:13px; transition:transform .15s; flex-shrink:0;}}
+  summary::before{{content:"▸"; color:var(--forest); font-size:13px; transition:transform .15s; flex-shrink:0;}}
   details[open] > summary::before{{ transform:rotate(90deg); }}
-  .owner-name{{font-weight:800; font-size:14px; color:var(--navy);}}
-  .owner-count{{font-size:12px; color:var(--sub); margin-left:auto;}}
+  .owner-name{{font-weight:800; font-size:14px; color:var(--forest);}}
+  .owner-count{{font-size:12px; color:var(--muted); margin-left:auto;}}
   .owner-deals{{padding:0 14px 14px; display:grid; gap:10px;}}
-  .deal-card{{border:1px solid var(--line); border-radius:8px; padding:12px 14px; background:#fff;}}
+  .deal-card{{border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:#fffdf8; border-left:6px solid var(--line);}}
+  .deal-card.urgent-high{{border-left-color:var(--coral);}}
+  .deal-card.urgent-mid{{border-left-color:var(--amber);}}
+  .deal-card.urgent-low{{border-left-color:var(--moss);}}
   .deal-head{{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;}}
   .deal-name{{font-weight:700; font-size:13px; color:var(--ink); word-break:break-word;}}
-  .deal-date{{font-size:11.5px; color:var(--sub); margin-bottom:8px;}}
+  .deal-date{{font-size:11.5px; color:var(--muted); margin-bottom:8px;}}
   .status-badge{{font-size:11px; font-weight:700; padding:2px 10px; border-radius:999px; flex-shrink:0; white-space:nowrap;}}
-  .st-new{{background:var(--gr-bg); color:#047857; border:1px solid var(--gr-bd);}}
-  .st-warn{{background:var(--or-bg); color:#92610B; border:1px solid var(--or-bd);}}
-  .st-danger{{background:var(--rd-bg); color:#B91C1C; border:1px solid var(--rd-bd);}}
-  .st-unknown{{background:#F1F5F9; color:#64748B; border:1px solid var(--line);}}
+  .st-new{{background:var(--moss-bg); color:#3e5228; border:1px solid var(--moss-bd);}}
+  .st-warn{{background:var(--amber-bg); color:#8a5a12; border:1px solid var(--amber-bd);}}
+  .st-danger{{background:var(--coral-bg); color:#8a3820; border:1px solid var(--coral-bd);}}
+  .st-unknown{{background:#f1ede2; color:#7c7263; border:1px solid var(--line);}}
   .deal-body{{display:grid; gap:5px;}}
   .frow{{display:flex; gap:8px; font-size:12.5px; align-items:baseline;}}
-  .flabel{{flex-shrink:0; width:96px; color:var(--sub); font-weight:600;}}
+  .flabel{{flex-shrink:0; width:96px; color:var(--muted); font-weight:600;}}
   .fval{{color:var(--ink); word-break:break-word;}}
-  .empty-note{{color:#9CA3AF; font-style:italic;}}
-  .footer-note{{margin:24px 24px 0; font-size:12px; color:var(--sub); text-align:center;}}
+  .empty-note{{color:#9b9384; font-style:italic;}}
+  .footer-note{{margin:24px 24px 0; font-size:12px; color:var(--muted); text-align:center;}}
 </style>
 </head>
 <body>
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
   <h1>公司名單 / 本月有機會 階段追蹤</h1>
-  <div class="range">依業務課分組｜公司名單規則：第 {COMPANY_LIST_REMIND_DAY}/{COMPANY_LIST_ESCALATE_DAY} 個工作天提醒／可轉派｜本月有機會規則：第 {OPPORTUNITY_MIDCHECK_DAY}/{OPPORTUNITY_ENDCHECK_DAY} 個工作天月中／月底檢核</div>
+  <div class="range">依業務課分組（一課～四課＋POS）｜同一位業務底下依緊急程度排序｜公司名單規則：第 {COMPANY_LIST_REMIND_DAY}/{COMPANY_LIST_ESCALATE_DAY} 個工作天提醒／可轉派｜本月有機會規則：第 {OPPORTUNITY_MIDCHECK_DAY}/{OPPORTUNITY_ENDCHECK_DAY} 個工作天月中／月底檢核</div>
   <div class="stat-line">共 {len(records)} 筆（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
 </div>
 <div class="stat-grid">
