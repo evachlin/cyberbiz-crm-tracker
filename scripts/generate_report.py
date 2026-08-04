@@ -359,6 +359,33 @@ NOTIFY_SCRIPT = '''<script>
         tag.style.display = "none";
       }
     });
+    renderLog(map);
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function renderLog(map) {
+    var body = document.getElementById("notifyLogBody");
+    var empty = document.getElementById("notifyLogEmpty");
+    if (!body) return;
+    var rows = Object.keys(map).map(function (id) { return map[id]; })
+      .sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+    if (rows.length === 0) {
+      body.innerHTML = "";
+      if (empty) empty.style.display = "block";
+      return;
+    }
+    if (empty) empty.style.display = "none";
+    body.innerHTML = rows.map(function (r) {
+      var daysTxt = (r.days === null || r.days === undefined) ? "-" : (r.days + " 個工作天");
+      return "<tr><td>" + esc(r.date) + "</td><td>" + esc(r.owner) + "</td><td>" + esc(r.email) +
+        "</td><td>" + esc(r.name) + "</td><td>" + esc(r.stage) + "</td><td>" + daysTxt +
+        "</td><td>" + esc(r.status) + "</td></tr>";
+    }).join("");
   }
 
   function updateToolbar() {
@@ -406,7 +433,13 @@ NOTIFY_SCRIPT = '''<script>
       }
       var url = buildMailto(g.email, g.owner, g.deals);
       setTimeout(function () { window.open(url, "_blank"); }, idx * 400);
-      g.deals.forEach(function (d) { map[d.id] = { date: todayStr() }; });
+      g.deals.forEach(function (d) {
+        map[d.id] = {
+          date: todayStr(), ts: Date.now(),
+          owner: g.owner, email: g.email,
+          name: d.name, stage: d.stage, days: d.days, status: d.status
+        };
+      });
     });
     saveNotified(map);
     paintNotified();
@@ -429,6 +462,12 @@ NOTIFY_SCRIPT = '''<script>
         saveNotified({});
         paintNotified();
       }
+    });
+    document.getElementById("toggleLogBtn").addEventListener("click", function () {
+      var panel = document.getElementById("notifyLogPanel");
+      var open = panel.style.display !== "none";
+      panel.style.display = open ? "none" : "block";
+      this.textContent = open ? "查看通知記錄" : "收起通知記錄";
     });
   });
 })();
@@ -625,6 +664,15 @@ def render_html(records, generated_at):
   .notify-check input{{width:16px; height:16px; cursor:pointer; accent-color:var(--forest);}}
   .notified-tag{{margin:2px 0 8px; font-size:11px; color:var(--forest); font-weight:700;
     background:var(--moss-bg); border:1px solid var(--moss-bd); border-radius:999px; padding:2px 10px; display:inline-block;}}
+
+  .notify-log-panel{{margin:0 24px 16px; background:rgba(255,250,241,.95); border:1px solid var(--line);
+    border-radius:16px; padding:14px 16px; box-shadow:var(--shadow);}}
+  .notify-log-title{{font-weight:800; color:var(--forest); font-size:13.5px; margin-bottom:8px;}}
+  .notify-log-empty{{font-size:12.5px; color:var(--muted); font-style:italic;}}
+  .notify-log-scroll{{overflow-x:auto;}}
+  .notify-log-table{{width:100%; border-collapse:collapse; font-size:12px; min-width:640px;}}
+  .notify-log-table th{{text-align:left; color:var(--forest); border-bottom:2px solid var(--line); padding:6px 8px; white-space:nowrap;}}
+  .notify-log-table td{{border-bottom:1px solid var(--line); padding:6px 8px; word-break:break-word;}}
 </style>
 </head>
 <body>
@@ -643,8 +691,19 @@ def render_html(records, generated_at):
 <div class="notify-toolbar">
   <button class="notify-btn-primary" id="notifyBtn" disabled>寄送提醒信（已勾選 0 筆）</button>
   <button class="notify-btn-secondary" id="clearCheckBtn">清除勾選</button>
+  <button class="notify-btn-secondary" id="toggleLogBtn">查看通知記錄</button>
   <button class="notify-btn-secondary" id="clearNotifiedBtn">清除本機已通知記錄</button>
-  <span class="notify-count" id="notifyHint">勾選交易卡片左上角的框，可以一次對多位不同業務寄出各自的提醒信（每人一封，只列出他自己被勾選的交易）。「已通知」標記只存在這台瀏覽器裡，換裝置不會同步。</span>
+  <span class="notify-count" id="notifyHint">勾選交易卡片左上角的框，可以一次對多位不同業務寄出各自的提醒信（每人一封，只列出他自己被勾選的交易）。「已通知」標記跟通知記錄都只存在這台瀏覽器裡，換裝置不會同步。</span>
+</div>
+<div class="notify-log-panel" id="notifyLogPanel" style="display:none">
+  <div class="notify-log-title">通知記錄（存在這台瀏覽器裡）</div>
+  <div class="notify-log-empty" id="notifyLogEmpty">目前還沒有任何通知記錄。</div>
+  <div class="notify-log-scroll">
+    <table class="notify-log-table">
+      <thead><tr><th>日期</th><th>業務</th><th>Email</th><th>交易名稱</th><th>階段</th><th>工作天數</th><th>狀態</th></tr></thead>
+      <tbody id="notifyLogBody"></tbody>
+    </table>
+  </div>
 </div>
 <div class="wrap">
   <div class="section-pad">
