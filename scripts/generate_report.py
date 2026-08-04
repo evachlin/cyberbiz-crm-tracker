@@ -114,10 +114,10 @@ def coql_query(token, select_query):
         if resp.status_code == 204:
             break
         resp.raise_for_status()
-        payload = resp.json().get("data", {})
-        page_rows = payload.get("data", [])
+        result = resp.json()
+        page_rows = result.get("data", [])
         rows.extend(page_rows)
-        info = payload.get("info", {})
+        info = result.get("info", {})
         if not info.get("more_records"):
             break
         offset += page_size
