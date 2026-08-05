@@ -170,23 +170,38 @@ def coql_query(token, select_query):
 def get_timeline(token, record_id, module="Deals", max_pages=10):
     """
     抓 Timeline，會翻頁抓到 max_pages 頁為止（不是只抓第一頁）。
-    原本只抓第一頁，如果一筆交易在真正變更階段之後又發生其他異動（備註、欄位編輯等），
-    那些異動會排在階段變更前面，可能把真正的階段變更記錄擠到後面幾頁而漏掉 ——
-    這正是曾經導致某些交易錯誤退回用建立時間估算的原因，加翻頁修正。
+
+    真正的根本 bug：Zoho Timeline API 回傳的資料是放在最上層的 "__timeline" 鍵，
+    不是 "data" 鍵（這點跟其他 CRM API 不一樣，很容易誤會）。原本程式寫
+    resp.json().get("data", [])，因為回應裡根本沒有 "data" 這個鍵，
+    永遠都拿到空陣列 —— 等於每一筆交易查 Timeline 都直接失敗、
+    全部都用建立時間回退估算，不是只有少數交易的問題。
     """
     url = f"{API_DOMAIN}/crm/{API_VERSION}/{module}/{record_id}/__timeline"
     items = []
     page_token = None
     for _ in range(max_pages):
-        params = {"sort_by": "audited_time", "sort_order": "desc", "include_inner_details": "true", "per_page": 200}
+        # 注意：Zoho 規定 per_page 跟 page_token 不能同時給，翻頁時只能用 page_token
         if page_token:
-            params["page_token"] = page_token
+            params = {
+                "sort_by": "audited_time",
+                "sort_order": "desc",
+                "include_inner_details": "true",
+                "page_token": page_token,
+            }
+        else:
+            params = {
+                "sort_by": "audited_time",
+                "sort_order": "desc",
+                "include_inner_details": "true",
+                "per_page": 200,
+            }
         resp = requests.get(url, headers=zoho_headers(token), params=params, timeout=15)
         if resp.status_code == 204:
             break
         resp.raise_for_status()
         result = resp.json()
-        page_items = result.get("data", [])
+        page_items = result.get("__timeline", [])
         if not page_items:
             break
         items.extend(page_items)
