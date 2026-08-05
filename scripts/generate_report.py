@@ -58,9 +58,15 @@ GMAIL_CLIENT_ID = os.environ.get("GMAIL_CLIENT_ID", "")
 GMAIL_CLIENT_SECRET = os.environ.get("GMAIL_CLIENT_SECRET", "")
 GMAIL_REFRESH_TOKEN = os.environ.get("GMAIL_REFRESH_TOKEN", "")
 GMAIL_AUTO_NOTIFY_ENABLED = bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN)
-# 目前只對「可轉派」「月底檢核」這兩個最緊急的狀態自動建草稿，其餘狀態維持只顯示在網頁上，
-# 不自動發信提醒，避免信件太多、太早通知造成干擾。要調整範圍就改這個 tuple。
-AUTO_NOTIFY_STATUSES = ("escalate", "endcheck")
+# 自動建草稿只對「需優先處理」等級的狀態觸發（見下面 URGENT_STATUSES 常數），其餘狀態
+# 維持只顯示在網頁上，不自動發信提醒，避免信件太多、太早通知造成干擾。
+
+# 主管彙整信（公司名單可轉派）：收件人固定寄給這位主管，他評估是否要轉派。
+# 用 "or" 不是 .get(key, default)：GitHub Actions 的 env: 區塊只要寫了
+# secrets.MANAGER_SUMMARY_EMAIL，即使沒設定那個 Secret 也會帶一個空字串進來，
+# 用 .get(key, default) 拿到的會是空字串而不是預設值，要用 "or" 才能正確 fallback。
+MANAGER_SUMMARY_EMAIL = os.environ.get("MANAGER_SUMMARY_EMAIL") or "ambrose.tsai@cyberbiz.io"
+MANAGER_SUMMARY_LOG_KEY = "_manager_summary"  # 存在 gmail_draft_log.json 裡的保留 key，跟一般交易 id 分開
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_PATH = os.path.join(REPO_ROOT, "data", "stage_cache.json")
@@ -103,14 +109,16 @@ TEAM_ORDER = ["業務一課", "業務二課", "業務三課", "業務四課", "P
 # 不需要另外改這個過濾邏輯。
 ROSTER_ONLY_FILTER = True
 
-STAGES_TRACKED = ["公司名單", "本月有機會"]
-TRACK_SINCE = "2026-01-01T00:00:00+08:00"  # 只追蹤這個日期之後建立的交易，避免把歷史上所有卡在這兩階段的舊資料全抓進來
+STAGES_TRACKED = ["公司名單", "本月有機會", "短期追蹤"]
+TRACK_SINCE = "2026-01-01T00:00:00+08:00"  # 只追蹤這個日期之後建立的交易，避免把歷史上所有卡在這幾個階段的舊資料全抓進來
 
 # 規則門檻（工作天，只排除週六週日，尚未納入國定假日 —— 之後要補請看 README）
 COMPANY_LIST_REMIND_DAY = 2      # 第 2 個工作天：提醒判斷有效/無效
 COMPANY_LIST_ESCALATE_DAY = 3    # 第 3 個工作天：標記可轉派
 OPPORTUNITY_MIDCHECK_DAY = 11    # 月中檢核
 OPPORTUNITY_ENDCHECK_DAY = 22    # 月底檢核
+# 短期追蹤：只有一個門檻，用「日曆天」算（不是工作天），超過就標記需優先處理
+SHORT_TERM_ESCALATE_DAYS = 90
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +225,17 @@ def workdays_between(start_dt, end_dt):
     return count
 
 
+def calendar_days_between(start_dt, end_dt):
+    """短期追蹤用：算日曆天（含假日），不排除週末，跟 workdays_between 不一樣。"""
+    if start_dt is None:
+        return None
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=TAIPEI_TZ)
+    start = start_dt.astimezone(TAIPEI_TZ).date()
+    end = end_dt.astimezone(TAIPEI_TZ).date()
+    return max((end - start).days, 0)
+
+
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
@@ -292,28 +311,40 @@ def build_records(token, rows, cache):
             print(f"進度 {idx}/{total}（本次已呼叫 Timeline API {api_calls_made} 次，已耗時 {elapsed:.0f} 秒）", flush=True)
 
         entered_dt = parse_zoho_dt(entered_at)
-        age_workdays = workdays_between(entered_dt, now) if entered_dt else None
 
         name, team = resolve_owner(r.get("Owner.email"), r.get("Owner.first_name"), r.get("Owner.last_name"))
 
         if stage == "公司名單":
-            if age_workdays is None:
+            age = workdays_between(entered_dt, now) if entered_dt else None
+            age_unit = "個工作天"
+            if age is None:
                 status = "unknown"
-            elif age_workdays >= COMPANY_LIST_ESCALATE_DAY:
+            elif age >= COMPANY_LIST_ESCALATE_DAY:
                 status = "escalate"
-            elif age_workdays >= COMPANY_LIST_REMIND_DAY:
+            elif age >= COMPANY_LIST_REMIND_DAY:
                 status = "remind"
             else:
                 status = "new"
-        else:  # 本月有機會
-            if age_workdays is None:
+        elif stage == "本月有機會":
+            age = workdays_between(entered_dt, now) if entered_dt else None
+            age_unit = "個工作天"
+            if age is None:
                 status = "unknown"
-            elif age_workdays >= OPPORTUNITY_ENDCHECK_DAY:
+            elif age >= OPPORTUNITY_ENDCHECK_DAY:
                 status = "endcheck"
-            elif age_workdays >= OPPORTUNITY_MIDCHECK_DAY:
+            elif age >= OPPORTUNITY_MIDCHECK_DAY:
                 status = "midcheck"
             else:
                 status = "tracking"
+        else:  # 短期追蹤：用日曆天算，只有一個門檻
+            age = calendar_days_between(entered_dt, now) if entered_dt else None
+            age_unit = "天"
+            if age is None:
+                status = "unknown"
+            elif age >= SHORT_TERM_ESCALATE_DAYS:
+                status = "st_escalate"
+            else:
+                status = "st_tracking"
 
         records.append({
             "id": rid,
@@ -324,7 +355,8 @@ def build_records(token, rows, cache):
             "Stage": stage,
             "進入此階段時間": entered_at,
             "進入時間備註": note,
-            "工作天數": age_workdays,
+            "工作天數": age,
+            "天數單位": age_unit,
             "狀態": status,
             "金額": r.get("Amount"),
             "預計成交日": r.get("Closing_Date"),
@@ -345,33 +377,50 @@ STATUS_LABEL = {
     "tracking": "追蹤中",
     "midcheck": f"月中檢核（≥{OPPORTUNITY_MIDCHECK_DAY}工作天）",
     "endcheck": f"月底檢核（≥{OPPORTUNITY_ENDCHECK_DAY}工作天）",
+    "st_tracking": "短期追蹤中",
+    "st_escalate": f"短期追蹤逾期（≥{SHORT_TERM_ESCALATE_DAYS}天）",
     "unknown": "天數未知",
 }
 STATUS_CLASS = {
     "new": "st-new", "remind": "st-warn", "escalate": "st-danger",
     "tracking": "st-new", "midcheck": "st-warn", "endcheck": "st-danger",
+    "st_tracking": "st-new", "st_escalate": "st-danger",
     "unknown": "st-unknown",
 }
 # 卡片排序用的緊急程度：數字越小越緊急，排最前面。同一層再依工作天數從多到少排。
 STATUS_PRIORITY = {
-    "escalate": 0, "endcheck": 0,
+    "escalate": 0, "endcheck": 0, "st_escalate": 0,
     "remind": 1, "midcheck": 1,
-    "new": 2, "tracking": 2,
+    "new": 2, "tracking": 2, "st_tracking": 2,
     "unknown": 3,
 }
+# 需要優先處理／會觸發自動 Gmail 草稿的狀態，集中在這裡管理，避免各處各寫一份漏掉新狀態。
+URGENT_STATUSES = ("escalate", "endcheck", "st_escalate")
 
 
 # ---------------------------------------------------------------------------
-# 勾選寄信提醒功能（純前端，開新分頁到 Gmail 網頁版寫信畫面，不會自動送出，也不需要任何伺服器。
-# 原本用 mailto: 連結，但公司網域管理的 Chrome 設定檔會鎖掉「預設信箱處理常式」權限，
-# 導致完全沒反應也不會跳錯誤，所以改成直接用 Gmail 的寫信網址，不需要任何協定權限。）
+# 報表本體是一張可篩選、可排序的表格（不再是巢狀展開的 accordion）。
+# 資料在 Python 端算好之後整包以 JSON 塞進頁面（REPORT_ROWS），畫面渲染、排序、篩選、
+# 勾選寄信全部交給前端 JS（REPORT_SCRIPT）處理，純前端、不需要任何伺服器。
+#
+# 勾選＋寄送提醒信：開新分頁到 Gmail 網頁版寫信畫面（不是 mailto:，因為公司網域管理的
+# Chrome 設定檔會鎖掉「預設信箱處理常式」權限，導致 mailto 完全沒反應也不會跳錯誤）。
 # 「已通知」標記存在瀏覽器 localStorage，只在同一台裝置/瀏覽器有效，不會跨裝置同步、
-# 也不會寫回 Zoho 或 GitHub（那需要後端，目前先不做，見 README）。
+# 也不會寫回 Zoho 或 GitHub（那需要後端，見 README）。
 # ---------------------------------------------------------------------------
-NOTIFY_SCRIPT = '''<script>
+REPORT_SCRIPT = '''<script>
 (function () {
   var STORE_KEY = "cyberbiz_notified_v1";
+  var activeTeam = "all";
+  var onlyUrgent = false;
+  var sortKey = null;
+  var sortDir = 1;
 
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
   function loadNotified() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); }
     catch (e) { return {}; }
@@ -383,28 +432,8 @@ NOTIFY_SCRIPT = '''<script>
     var d = new Date();
     return d.getFullYear() + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0");
   }
-
-  function paintNotified() {
-    var map = loadNotified();
-    document.querySelectorAll(".deal-card").forEach(function (card) {
-      var id = card.getAttribute("data-deal-id");
-      var tag = card.querySelector(".notified-tag");
-      var box = card.querySelector(".notify-box");
-      if (map[id]) {
-        tag.style.display = "inline-block";
-        tag.textContent = "已於 " + map[id].date + " 通知";
-        if (box) { box.checked = false; }
-      } else {
-        tag.style.display = "none";
-      }
-    });
-    renderLog(map);
-  }
-
-  function esc(s) {
-    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
-    });
+  function daysText(r) {
+    return (r.days === null || r.days === undefined) ? "天數未知" : (r.days + " " + r.daysUnit);
   }
 
   function renderLog(map) {
@@ -420,7 +449,7 @@ NOTIFY_SCRIPT = '''<script>
     }
     if (empty) empty.style.display = "none";
     body.innerHTML = rows.map(function (r) {
-      var daysTxt = (r.days === null || r.days === undefined) ? "-" : (r.days + " 個工作天");
+      var daysTxt = (r.days === null || r.days === undefined) ? "-" : (r.days + " " + (r.daysUnit || "個工作天"));
       return "<tr><td>" + esc(r.date) + "</td><td>" + esc(r.owner) + "</td><td>" + esc(r.email) +
         "</td><td>" + esc(r.name) + "</td><td>" + esc(r.stage) + "</td><td>" + daysTxt +
         "</td><td>" + esc(r.status) + "</td></tr>";
@@ -434,23 +463,18 @@ NOTIFY_SCRIPT = '''<script>
     btn.disabled = checked.length === 0;
   }
 
-  function buildMailto(ownerEmail, ownerName, deals) {
+  function buildGmailUrl(ownerEmail, ownerName, deals) {
     var subject = "【ZOHO交易階段提醒】" + ownerName + " 你有 " + deals.length + " 筆交易需要更新進度";
     var lines = [ownerName + " 你好，", "",
       "以下 " + deals.length + " 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：", ""];
     deals.forEach(function (d) {
-      var daysTxt = (d.days === null || d.days === undefined) ? "天數未知" : ("已 " + d.days + " 個工作天");
-      lines.push("・" + d.name + "（" + d.stage + "，" + daysTxt + "，" + d.status + "）");
-      if (d.crmUrl) {
-        lines.push("   點我開啟這筆交易：" + d.crmUrl);
-      }
+      lines.push("・" + d.name + "（" + d.stage + "，" + daysText(d) + "，" + d.statusLabel + "）");
+      lines.push("   點我開啟這筆交易：" + d.crmUrl);
     });
     lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
-    // 改用 Gmail 網頁版的寫信網址，而不是 mailto:。
-    // mailto: 需要瀏覽器/系統註冊「預設信箱處理常式」才會有反應，
-    // 公司網域管理的 Chrome 設定檔常常直接鎖掉這個權限，導致完全沒反應也不會有錯誤訊息。
-    // Gmail 的網頁版寫信網址就是一般網址，不需要任何協定權限，開起來最穩。
+    // Gmail 網頁版的寫信網址，不是 mailto:（mailto 需要瀏覽器/系統註冊處理常式，
+    // 公司網域管理的 Chrome 設定檔常常鎖掉這個權限，導致完全沒反應）。
     return "https://mail.google.com/mail/?view=cm&fs=1&tf=1" +
       "&to=" + encodeURIComponent(ownerEmail) +
       "&su=" + encodeURIComponent(subject) +
@@ -463,44 +487,92 @@ NOTIFY_SCRIPT = '''<script>
 
     var groups = {};
     checked.forEach(function (box) {
-      var card = box.closest(".deal-card");
-      var data = JSON.parse(card.getAttribute("data-deal"));
-      var key = data.email || data.owner;
-      if (!groups[key]) { groups[key] = { owner: data.owner, email: data.email, deals: [] }; }
-      groups[key].deals.push(data);
+      var row = REPORT_ROWS.find(function (r) { return r.id === box.dataset.id; });
+      if (!row) return;
+      var key = row.email || row.owner;
+      if (!groups[key]) { groups[key] = { owner: row.owner, email: row.email, deals: [] }; }
+      groups[key].deals.push(row);
     });
 
     var map = loadNotified();
-    var keys = Object.keys(groups);
-    keys.forEach(function (key, idx) {
+    Object.keys(groups).forEach(function (key) {
       var g = groups[key];
       if (!g.email) {
         alert(g.owner + " 找不到 email，已略過，請手動聯絡。");
         return;
       }
-      var url = buildMailto(g.email, g.owner, g.deals);
-      // 開新分頁到 Gmail 寫信畫面。維持同步呼叫（不要用 setTimeout 延遲），
-      // 這樣瀏覽器才會判斷這是使用者剛剛點擊觸發的動作，不會被彈跳視窗攔截器擋掉。
+      var url = buildGmailUrl(g.email, g.owner, g.deals);
+      // 同步呼叫 window.open（不要用 setTimeout 延遲），瀏覽器才會判斷這是使用者
+      // 剛剛點擊觸發的動作，不會被彈跳視窗攔截器擋掉。
       window.open(url, "_blank");
       g.deals.forEach(function (d) {
         map[d.id] = {
           date: todayStr(), ts: Date.now(),
           owner: g.owner, email: g.email,
-          name: d.name, stage: d.stage, days: d.days, status: d.status
+          name: d.name, stage: d.stage, days: d.days, daysUnit: d.daysUnit, status: d.statusLabel
         };
       });
     });
     saveNotified(map);
-    paintNotified();
-    updateToolbar();
+    renderTable();
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    paintNotified();
-    updateToolbar();
+  function renderTable() {
+    var notified = loadNotified();
+    var data = REPORT_ROWS.filter(function (r) {
+      if (activeTeam !== "all" && r.team !== activeTeam) return false;
+      if (onlyUrgent && r.priority !== 0) return false;
+      return true;
+    });
+    if (sortKey) {
+      data = data.slice().sort(function (a, b) {
+        var av = a[sortKey], bv = b[sortKey];
+        if (av === null || av === undefined) av = (typeof bv === "number") ? -1 : "";
+        if (bv === null || bv === undefined) bv = (typeof av === "number") ? -1 : "";
+        if (typeof av === "string") return sortDir * av.localeCompare(bv);
+        return sortDir * (av - bv);
+      });
+    }
+    var tbody = document.getElementById("tbody");
+    tbody.innerHTML = "";
+    data.forEach(function (r) {
+      var isNotified = notified[r.id];
+      var tr = document.createElement("tr");
+      tr.className = "data-row";
+      var nameCell = esc(r.name) + (isNotified ? '<span class="notified-tag">已於 ' + esc(isNotified.date) + " 通知</span>" : "");
+      tr.innerHTML =
+        '<td onclick="event.stopPropagation()"><input type="checkbox" class="notify-box" data-id="' + esc(r.id) + '"></td>' +
+        '<td><span class="dot ' + r.dotClass + '"></span>' + esc(r.statusLabel) + "</td>" +
+        "<td>" + nameCell + "</td>" +
+        '<td><span class="team-pill">' + esc(r.team) + "</span></td>" +
+        "<td>" + esc(r.owner) + "</td>" +
+        '<td class="days">' + esc(daysText(r)) + "</td>" +
+        "<td>" + (r.amount ? esc(r.amount) : "-") + "</td>";
+      var detail = document.createElement("tr");
+      detail.className = "detail-row";
+      var chips = "";
+      if (r.productType) chips += '<span class="chip">' + esc(r.productType) + "</span>";
+      if (r.source) chips += '<span class="chip">' + esc(r.source) + "</span>";
+      if (r.closingDate) chips += '<span class="chip">預計成交：' + esc(r.closingDate) + "</span>";
+      detail.innerHTML = '<td colspan="7">' +
+        "進入此階段：" + esc(r.enteredAt || "未知") +
+        (r.note ? "<br>備註：" + esc(r.note) : "") +
+        '<div class="chips">' + chips + "</div>" +
+        '<a class="crm-link" href="' + esc(r.crmUrl) + '" target="_blank" rel="noopener">在 Zoho CRM 開啟這筆交易 &rarr;</a>' +
+        "</td>";
+      tr.addEventListener("click", function () { detail.classList.toggle("open"); });
+      tbody.appendChild(tr);
+      tbody.appendChild(detail);
+    });
     document.querySelectorAll(".notify-box").forEach(function (box) {
       box.addEventListener("change", updateToolbar);
     });
+    updateToolbar();
+    renderLog(notified);
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    renderTable();
     document.getElementById("notifyBtn").addEventListener("click", onSendClick);
     document.getElementById("clearCheckBtn").addEventListener("click", function () {
       document.querySelectorAll(".notify-box:checked").forEach(function (b) { b.checked = false; });
@@ -509,7 +581,7 @@ NOTIFY_SCRIPT = '''<script>
     document.getElementById("clearNotifiedBtn").addEventListener("click", function () {
       if (confirm("要清除這台瀏覽器裡記錄的「已通知」標記嗎？（只影響這台裝置，不影響實際資料）")) {
         saveNotified({});
-        paintNotified();
+        renderTable();
       }
     });
     document.getElementById("toggleLogBtn").addEventListener("click", function () {
@@ -517,6 +589,25 @@ NOTIFY_SCRIPT = '''<script>
       var open = panel.style.display !== "none";
       panel.style.display = open ? "none" : "block";
       this.textContent = open ? "查看通知記錄" : "收起通知記錄";
+    });
+    document.getElementById("filters").addEventListener("click", function (e) {
+      var btn = e.target.closest(".chip-btn");
+      if (!btn) return;
+      if (btn.dataset.urgent) {
+        onlyUrgent = !onlyUrgent;
+        btn.classList.toggle("active", onlyUrgent);
+      } else {
+        activeTeam = btn.dataset.team;
+        document.querySelectorAll(".chip-btn[data-team]").forEach(function (b) { b.classList.toggle("active", b === btn); });
+      }
+      renderTable();
+    });
+    document.querySelectorAll("th[data-sort]").forEach(function (th) {
+      th.addEventListener("click", function () {
+        var key = th.dataset.sort;
+        if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = 1; }
+        renderTable();
+      });
     });
   });
 })();
@@ -537,98 +628,60 @@ def fmt_amount(v):
 
 
 def render_html(records, generated_at):
-    by_team = defaultdict(lambda: defaultdict(list))
-    for r in records:
-        by_team[r["業務課"]][r["業務"]].append(r)
-
     stage_counter = Counter(r["Stage"] for r in records)
-    escalate_count = sum(1 for r in records if r["狀態"] in ("escalate", "endcheck"))
+    urgent_count = sum(1 for r in records if r["狀態"] in URGENT_STATUSES)
+    teams_present = [t for t in TEAM_ORDER if any(r["業務課"] == t for r in records)]
 
-    team_sections = []
-    for team in TEAM_ORDER:
-        if team not in by_team:
-            continue
-        owners = by_team[team]
-        owners_sorted = sorted(owners.keys(), key=lambda x: x.lower())
-        team_total = sum(len(v) for v in owners.values())
-        team_escalate = sum(1 for v in owners.values() for d in v if d["狀態"] in ("escalate", "endcheck"))
+    # 預設排序：緊急程度優先，同層再依天數從多到少（使用者點欄位標題可以在網頁上重新排序）
+    sorted_records = sorted(
+        records,
+        key=lambda r: (
+            STATUS_PRIORITY.get(r["狀態"], 9),
+            -(r["工作天數"] if r["工作天數"] is not None else -1),
+        ),
+    )
 
-        owner_blocks = []
-        for owner in owners_sorted:
-            # 先依「緊急程度」排（可轉派／月底檢核最前面），同緊急程度內再依工作天數從多到少排
-            deals = sorted(
-                owners[owner],
-                key=lambda r: (
-                    STATUS_PRIORITY.get(r["狀態"], 9),
-                    -(r["工作天數"] if r["工作天數"] is not None else -1),
-                ),
-            )
-            cards = []
-            for d in deals:
-                rows = []
-                amt = fmt_amount(d["金額"])
-                if amt:
-                    rows.append(f'<div class="frow"><span class="flabel">金額</span><span class="fval">{esc(amt)}</span></div>')
-                if d["商品類別"]:
-                    rows.append(f'<div class="frow"><span class="flabel">商品類別</span><span class="fval">{esc(d["商品類別"])}</span></div>')
-                if d["名單來源"]:
-                    rows.append(f'<div class="frow"><span class="flabel">名單來源</span><span class="fval">{esc(d["名單來源"])}</span></div>')
-                if d["預計成交日"]:
-                    rows.append(f'<div class="frow"><span class="flabel">預計成交日</span><span class="fval">{esc(d["預計成交日"])}</span></div>')
-                if d["進入時間備註"]:
-                    rows.append(f'<div class="frow"><span class="flabel">備註</span><span class="fval">{esc(d["進入時間備註"])}</span></div>')
-                rows_html = "\n".join(rows) if rows else '<div class="frow empty-note">其餘欄位皆未填寫</div>'
-                age_txt = f'{d["工作天數"]} 個工作天' if d["工作天數"] is not None else "天數未知"
-                stage_tag = "公司名單" if d["Stage"] == "公司名單" else "本月有機會"
-                urgency_cls = {0: "urgent-high", 1: "urgent-mid", 2: "urgent-low"}.get(
-                    STATUS_PRIORITY.get(d["狀態"], 9), "urgent-none"
-                )
-                notify_payload = json.dumps({
-                    "id": d["id"],
-                    "name": d["交易名稱"] or "",
-                    "owner": d["業務"] or "",
-                    "email": d["業務Email"] or "",
-                    "stage": stage_tag,
-                    "days": d["工作天數"],
-                    "status": STATUS_LABEL[d["狀態"]],
-                    "crmUrl": f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}",
-                }, ensure_ascii=False)
-                cards.append(f'''
-        <div class="deal-card {urgency_cls}" data-deal-id="{esc(d["id"])}" data-deal='{esc(notify_payload)}'>
-          <div class="deal-head">
-            <label class="notify-check"><input type="checkbox" class="notify-box"><span></span></label>
-            <span class="deal-name">{esc(d["交易名稱"])}</span>
-            <span class="status-badge {STATUS_CLASS[d["狀態"]]}">{esc(STATUS_LABEL[d["狀態"]])}</span>
-          </div>
-          <div class="deal-date">階段：{esc(stage_tag)} ｜ 進入此階段：{esc((d["進入此階段時間"] or "")[:19].replace("T", " "))} ｜ 已 {esc(age_txt)}</div>
-          <div class="notified-tag" style="display:none"></div>
-          <div class="deal-body">
-            {rows_html}
-          </div>
-        </div>''')
-            owner_blocks.append(f'''
-      <details class="owner-block">
-        <summary>
-          <span class="owner-name">{esc(owner)}</span>
-          <span class="owner-count">共 {len(deals)} 筆</span>
-        </summary>
-        <div class="owner-deals">
-          {"".join(cards)}
-        </div>
-      </details>''')
+    row_objs = []
+    for d in sorted_records:
+        try:
+            amount_raw = float(d["金額"]) if d["金額"] not in (None, "") else 0
+        except (TypeError, ValueError):
+            amount_raw = 0
+        priority = STATUS_PRIORITY.get(d["狀態"], 9)
+        if d["狀態"] == "unknown":
+            dot_class = "d-unknown"
+        elif priority == 0:
+            dot_class = "d-danger"
+        elif priority == 1:
+            dot_class = "d-warn"
+        else:
+            dot_class = "d-ok"
+        row_objs.append({
+            "id": d["id"],
+            "name": d["交易名稱"] or "",
+            "team": d["業務課"],
+            "owner": d["業務"] or "",
+            "email": d["業務Email"] or "",
+            "stage": d["Stage"],
+            "days": d["工作天數"],
+            "daysUnit": d["天數單位"],
+            "statusLabel": STATUS_LABEL[d["狀態"]],
+            "dotClass": dot_class,
+            "priority": priority,
+            "amount": fmt_amount(d["金額"]) or "",
+            "amountRaw": amount_raw,
+            "productType": d["商品類別"] or "",
+            "source": d["名單來源"] or "",
+            "closingDate": d["預計成交日"] or "",
+            "note": d["進入時間備註"] or "",
+            "enteredAt": (d["進入此階段時間"] or "")[:19].replace("T", " "),
+            "crmUrl": f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}",
+        })
+    rows_json = json.dumps(row_objs, ensure_ascii=False)
 
-        team_sections.append(f'''
-    <details class="team-block" open>
-      <summary>
-        <span class="team-name">{esc(team)}</span>
-        <span class="team-count">{len(owners_sorted)} 位業務　·　共 {team_total} 筆　·　{team_escalate} 筆需優先處理</span>
-      </summary>
-      <div class="team-owners">
-        {"".join(owner_blocks)}
-      </div>
-    </details>''')
-
-    body_sections = "\n".join(team_sections)
+    team_filter_buttons = "\n  ".join(
+        f'<button class="chip-btn" data-team="{esc(t)}">{esc(t)}</button>' for t in teams_present
+    )
 
     return f'''<!doctype html>
 <html lang="zh-Hant">
@@ -653,7 +706,7 @@ def render_html(records, generated_at):
       radial-gradient(circle at 85% 0%, rgba(19,82,63,.18), transparent 28%),
       linear-gradient(135deg,#fbf3e4 0%,#efe1cc 62%,#e7d8bf 100%);
   }}
-  .wrap{{max-width:960px;margin:0 auto;padding:0 0 60px;}}
+  .wrap{{max-width:1000px;margin:0 auto;padding:0 0 60px;}}
   .hero{{background:linear-gradient(150deg,var(--forest) 0%,var(--forest2) 58%,#24302b 100%);
     color:#fff8ea;padding:34px 32px 28px;margin-bottom:26px; box-shadow:var(--shadow);}}
   .eyebrow{{font-size:12.5px;font-weight:800;letter-spacing:.14em;color:#f5cf82;text-transform:uppercase;margin-bottom:10px;}}
@@ -661,46 +714,10 @@ def render_html(records, generated_at):
   .range{{font-size:13px;color:#e6dcc4;}}
   .stat-line{{margin-top:14px;font-size:12.5px;color:#e6dcc4;}}
   .section-pad{{padding:0 24px;}}
-  .stat-grid{{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:18px 24px 6px;}}
-  @media (max-width:700px){{ .stat-grid{{grid-template-columns:repeat(2,1fr);}} }}
+  .stat-grid{{display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:18px 24px 6px;}}
   .stat-box{{background:rgba(255,250,241,.92); border:1px solid var(--line); border-radius:16px; padding:14px 16px; text-align:center; box-shadow:var(--shadow);}}
   .stat-box .num{{font-size:22px; font-weight:800; color:var(--forest);}}
   .stat-box .lbl{{font-size:11.5px; color:var(--muted); margin-top:4px;}}
-  details.team-block{{background:var(--card); border:1px solid var(--line); border-radius:26px; margin-bottom:16px; overflow:hidden; box-shadow:var(--shadow);}}
-  details.team-block > summary{{padding:16px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-    background:linear-gradient(150deg,var(--forest) 0%,var(--forest2) 100%); cursor:pointer; list-style:none; user-select:none;}}
-  details.team-block > summary::-webkit-details-marker{{display:none;}}
-  details.team-block > summary::before{{content:"▾"; color:#fff8ea; font-size:15px; transition:transform .15s; flex-shrink:0;}}
-  details.team-block:not([open]) > summary::before{{ transform:rotate(-90deg); }}
-  .team-name{{font-weight:800; font-size:15.5px; color:#fff8ea;}}
-  .team-count{{font-size:12px; color:#e6dcc4; margin-left:auto;}}
-  .team-owners{{padding:14px 16px 4px;}}
-  details.owner-block{{background:#fffdf8; border:1px solid var(--line); border-radius:18px; margin-bottom:10px; overflow:hidden;}}
-  details.owner-block[open]{{border-color:var(--amber);}}
-  summary{{list-style:none; cursor:pointer; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; user-select:none;}}
-  summary::-webkit-details-marker{{display:none;}}
-  summary::before{{content:"▸"; color:var(--forest); font-size:13px; transition:transform .15s; flex-shrink:0;}}
-  details[open] > summary::before{{ transform:rotate(90deg); }}
-  .owner-name{{font-weight:800; font-size:14px; color:var(--forest);}}
-  .owner-count{{font-size:12px; color:var(--muted); margin-left:auto;}}
-  .owner-deals{{padding:0 14px 14px; display:grid; gap:10px;}}
-  .deal-card{{border:1px solid var(--line); border-radius:14px; padding:12px 14px; background:#fffdf8; border-left:6px solid var(--line);}}
-  .deal-card.urgent-high{{border-left-color:var(--coral);}}
-  .deal-card.urgent-mid{{border-left-color:var(--amber);}}
-  .deal-card.urgent-low{{border-left-color:var(--moss);}}
-  .deal-head{{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;}}
-  .deal-name{{font-weight:700; font-size:13px; color:var(--ink); word-break:break-word;}}
-  .deal-date{{font-size:11.5px; color:var(--muted); margin-bottom:8px;}}
-  .status-badge{{font-size:11px; font-weight:700; padding:2px 10px; border-radius:999px; flex-shrink:0; white-space:nowrap;}}
-  .st-new{{background:var(--moss-bg); color:#3e5228; border:1px solid var(--moss-bd);}}
-  .st-warn{{background:var(--amber-bg); color:#8a5a12; border:1px solid var(--amber-bd);}}
-  .st-danger{{background:var(--coral-bg); color:#8a3820; border:1px solid var(--coral-bd);}}
-  .st-unknown{{background:#f1ede2; color:#7c7263; border:1px solid var(--line);}}
-  .deal-body{{display:grid; gap:5px;}}
-  .frow{{display:flex; gap:8px; font-size:12.5px; align-items:baseline;}}
-  .flabel{{flex-shrink:0; width:96px; color:var(--muted); font-weight:600;}}
-  .fval{{color:var(--ink); word-break:break-word;}}
-  .empty-note{{color:#9b9384; font-style:italic;}}
   .footer-note{{margin:24px 24px 0; font-size:12px; color:var(--muted); text-align:center;}}
 
   .notify-toolbar{{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 24px 10px;
@@ -710,10 +727,6 @@ def render_html(records, generated_at):
   .notify-btn-primary:disabled{{background:#c9c2b3; cursor:not-allowed;}}
   .notify-btn-secondary{{background:#efe2c8; color:var(--forest);}}
   .notify-count{{font-size:12.5px; color:var(--muted); margin-left:auto;}}
-  .notify-check{{display:inline-flex; align-items:center; margin-right:2px; cursor:pointer;}}
-  .notify-check input{{width:16px; height:16px; cursor:pointer; accent-color:var(--forest);}}
-  .notified-tag{{margin:2px 0 8px; font-size:11px; color:var(--forest); font-weight:700;
-    background:var(--moss-bg); border:1px solid var(--moss-bd); border-radius:999px; padding:2px 10px; display:inline-block;}}
 
   .notify-log-panel{{margin:0 24px 16px; background:rgba(255,250,241,.95); border:1px solid var(--line);
     border-radius:16px; padding:14px 16px; box-shadow:var(--shadow);}}
@@ -723,27 +736,60 @@ def render_html(records, generated_at):
   .notify-log-table{{width:100%; border-collapse:collapse; font-size:12px; min-width:640px;}}
   .notify-log-table th{{text-align:left; color:var(--forest); border-bottom:2px solid var(--line); padding:6px 8px; white-space:nowrap;}}
   .notify-log-table td{{border-bottom:1px solid var(--line); padding:6px 8px; word-break:break-word;}}
+
+  .filters{{display:flex; flex-wrap:wrap; gap:8px; margin:0 24px 14px;}}
+  .chip-btn{{border:1px solid var(--line); background:#fffdf8; color:var(--forest); font-size:12px; font-weight:700;
+    padding:7px 14px; border-radius:999px; cursor:pointer; font-family:inherit;}}
+  .chip-btn.active{{background:var(--forest); color:#fff8ea; border-color:var(--forest);}}
+  .chip-btn.urgent-toggle.active{{background:var(--coral); border-color:var(--coral);}}
+
+  .table-wrap{{margin:0 24px; overflow-x:auto; border-radius:16px; box-shadow:var(--shadow);}}
+  table{{width:100%; border-collapse:collapse; background:var(--card); min-width:680px;}}
+  thead th{{text-align:left; font-size:11px; color:#e6dcc4; background:linear-gradient(150deg,var(--forest) 0%,var(--forest2) 100%); padding:10px 12px; cursor:pointer; user-select:none; white-space:nowrap;}}
+  thead th:hover{{text-decoration:underline;}}
+  thead th.no-sort{{cursor:default;}}
+  thead th.no-sort:hover{{text-decoration:none;}}
+  tbody tr.data-row{{border-bottom:1px solid var(--line); cursor:pointer;}}
+  tbody tr.data-row:hover{{background:#fff4e0;}}
+  tbody td{{padding:10px 12px; font-size:12.5px; vertical-align:middle;}}
+  .dot{{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; vertical-align:middle;}}
+  .dot.d-danger{{background:var(--coral);}}
+  .dot.d-warn{{background:var(--amber);}}
+  .dot.d-ok{{background:var(--moss);}}
+  .dot.d-unknown{{background:#b4b2a9;}}
+  .team-pill{{font-size:10.5px; padding:2px 8px; border-radius:999px; background:var(--moss-bg); color:#3e5228; border:1px solid var(--moss-bd); white-space:nowrap;}}
+  .days{{font-weight:700;}}
+  .notified-tag{{display:block; margin-top:3px; font-size:10px; color:var(--forest); font-weight:700;
+    background:var(--moss-bg); border:1px solid var(--moss-bd); border-radius:999px; padding:1px 8px; width:fit-content;}}
+  .detail-row td{{background:#fff8ea; font-size:12px; color:var(--muted); padding:10px 16px 14px;}}
+  .detail-row{{display:none;}}
+  .detail-row.open{{display:table-row;}}
+  .chips{{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;}}
+  .chip{{font-size:11px; padding:3px 9px; border-radius:999px; background:#fff; border:1px solid var(--line); color:var(--ink);}}
+  .crm-link{{color:var(--forest); font-weight:700; text-decoration:underline; display:inline-block; margin-top:6px;}}
+  .notify-box{{width:15px; height:15px; cursor:pointer; accent-color:var(--forest);}}
 </style>
 </head>
 <body>
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
-  <h1>公司名單 / 本月有機會 階段追蹤</h1>
-  <div class="range">依業務課分組（一課～四課＋POS）｜同一位業務底下依緊急程度排序｜公司名單規則：第 {COMPANY_LIST_REMIND_DAY}/{COMPANY_LIST_ESCALATE_DAY} 個工作天提醒／可轉派｜本月有機會規則：第 {OPPORTUNITY_MIDCHECK_DAY}/{OPPORTUNITY_ENDCHECK_DAY} 個工作天月中／月底檢核</div>
-  <div class="stat-line">共 {len(records)} 筆（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
+  <h1>公司名單 / 本月有機會 / 短期追蹤 階段追蹤</h1>
+  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose）｜上方可依課別篩選、只看需優先處理，點欄位標題可排序｜公司名單規則：第 {COMPANY_LIST_REMIND_DAY}/{COMPANY_LIST_ESCALATE_DAY} 個工作天提醒／可轉派｜本月有機會規則：第 {OPPORTUNITY_MIDCHECK_DAY}/{OPPORTUNITY_ENDCHECK_DAY} 個工作天月中／月底檢核｜短期追蹤規則：超過 {SHORT_TERM_ESCALATE_DAYS} 天標記需優先處理</div>
+  <div class="stat-line">共 {len(records)} 筆（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
 </div>
 <div class="stat-grid">
   <div class="stat-box"><div class="num">{len(records)}</div><div class="lbl">追蹤中總筆數</div></div>
   <div class="stat-box"><div class="num">{stage_counter.get("公司名單",0)}</div><div class="lbl">公司名單</div></div>
   <div class="stat-box"><div class="num">{stage_counter.get("本月有機會",0)}</div><div class="lbl">本月有機會</div></div>
-  <div class="stat-box"><div class="num">{escalate_count}</div><div class="lbl">已超過門檻，需優先處理</div></div>
+  <div class="stat-box"><div class="num">{stage_counter.get("短期追蹤",0)}</div><div class="lbl">短期追蹤</div></div>
+  <div class="stat-box"><div class="num">{urgent_count}</div><div class="lbl">已超過門檻，需優先處理</div></div>
 </div>
 <div class="notify-toolbar">
   <button class="notify-btn-primary" id="notifyBtn" disabled>寄送提醒信（已勾選 0 筆）</button>
   <button class="notify-btn-secondary" id="clearCheckBtn">清除勾選</button>
   <button class="notify-btn-secondary" id="toggleLogBtn">查看通知記錄</button>
   <button class="notify-btn-secondary" id="clearNotifiedBtn">清除本機已通知記錄</button>
-  <span class="notify-count" id="notifyHint">勾選交易卡片左上角的框，可以一次對多位不同業務寄出各自的提醒信（每人一封，只列出他自己被勾選的交易）。「已通知」標記跟通知記錄都只存在這台瀏覽器裡，換裝置不會同步。</span>
+  <span class="notify-count" id="notifyHint">勾選左側框，可以一次對多位不同業務寄出各自的提醒信（每人一封，只列出他自己被勾選的交易）。「已通知」標記跟通知記錄都只存在這台瀏覽器裡，換裝置不會同步。</span>
 </div>
 <div class="notify-log-panel" id="notifyLogPanel" style="display:none">
   <div class="notify-log-title">通知記錄（存在這台瀏覽器裡）</div>
@@ -755,13 +801,32 @@ def render_html(records, generated_at):
     </table>
   </div>
 </div>
-<div class="wrap">
-  <div class="section-pad">
-    {body_sections}
-  </div>
-  <div class="footer-note">工作天計算目前只排除週六、週日，尚未納入國定假日／補班日（v1）。資料來源：Zoho CRM Deals 模組，由 GitHub Actions 每日排程自動更新。</div>
+<div class="filters" id="filters">
+  <button class="chip-btn active" data-team="all">全部</button>
+  <button class="chip-btn urgent-toggle" data-urgent="1">只看需優先處理</button>
+  {team_filter_buttons}
 </div>
-''' + NOTIFY_SCRIPT + '''
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="no-sort"></th>
+        <th data-sort="priority">狀態</th>
+        <th data-sort="name">交易名稱</th>
+        <th data-sort="team">課別</th>
+        <th data-sort="owner">業務</th>
+        <th data-sort="days">工作天數</th>
+        <th data-sort="amountRaw">金額</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+<div class="wrap">
+  <div class="footer-note">工作天／短期追蹤天數計算目前只排除週六、週日（工作天）或用日曆天數（短期追蹤），尚未納入國定假日／補班日（v1）。資料來源：Zoho CRM Deals 模組，由 GitHub Actions 每日排程自動更新。</div>
+</div>
+<script>var REPORT_ROWS = {rows_json};</script>
+''' + REPORT_SCRIPT + '''
 </body>
 </html>'''
 
@@ -812,13 +877,12 @@ def build_notify_html(owner_name, deals):
     """組出提醒信的 HTML 內容：Verdana 字體、階段資訊粗體、交易名稱本身是超連結。"""
     items_html = []
     for d in deals:
-        days_txt = "天數未知" if d["工作天數"] is None else f'已 {d["工作天數"]} 個工作天'
-        stage_tag = "公司名單" if d["Stage"] == "公司名單" else "本月有機會"
+        days_txt = "天數未知" if d["工作天數"] is None else f'已 {d["工作天數"]} {d["天數單位"]}'
         crm_url = f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}"
         items_html.append(
             '<li style="margin-bottom:8px;">'
             f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a>'
-            f'　<b>（{esc(stage_tag)}，{esc(days_txt)}，{esc(STATUS_LABEL[d["狀態"]])}）</b>'
+            f'　<b>（{esc(d["Stage"])}，{esc(days_txt)}，{esc(STATUS_LABEL[d["狀態"]])}）</b>'
             '</li>'
         )
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
@@ -828,6 +892,29 @@ def build_notify_html(owner_name, deals):
     {"".join(items_html)}
   </ul>
   <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
+  <p>謝謝！</p>
+</div>'''
+
+
+def build_manager_summary_html(deals):
+    """公司名單可轉派彙整信：跨業務、跨課別，寄給主管評估是否轉派。"""
+    items_html = []
+    for d in deals:
+        days_txt = "天數未知" if d["工作天數"] is None else f'已 {d["工作天數"]} {d["天數單位"]}'
+        crm_url = f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}"
+        items_html.append(
+            '<li style="margin-bottom:8px;">'
+            f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a>'
+            f'　<b>（{esc(d["業務課"])} {esc(d["業務"])}，{esc(days_txt)}）</b>'
+            '</li>'
+        )
+    return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
+  <p>Ambrose 你好，</p>
+  <p>以下 {len(deals)} 筆「公司名單」交易已經超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天沒有更新，麻煩幫忙評估是否需要轉派給其他業務：</p>
+  <ul style="padding-left:20px;">
+    {"".join(items_html)}
+  </ul>
+  <p>如果已經處理過（例如已判斷有效/無效、或已經聯繫客戶），也麻煩請對應業務補填最新狀態，避免重複出現在這份清單。</p>
   <p>謝謝！</p>
 </div>'''
 
@@ -861,7 +948,7 @@ def run_auto_notify(records):
     log = load_draft_log()
     by_owner = defaultdict(list)
     for r in records:
-        if r["狀態"] not in AUTO_NOTIFY_STATUSES:
+        if r["狀態"] not in URGENT_STATUSES:
             continue
         entry = log.get(r["id"])
         if entry and entry.get("status") == r["狀態"]:
@@ -869,7 +956,7 @@ def run_auto_notify(records):
         by_owner[(r["業務Email"], r["業務"])].append(r)
 
     if not by_owner:
-        print("沒有新的可轉派／月底檢核交易需要建立提醒草稿。")
+        print("沒有新的需優先處理交易需要建立提醒草稿。")
         return
 
     try:
@@ -900,6 +987,49 @@ def run_auto_notify(records):
     print(f"本次共建立 {created} 封提醒草稿，存在寄件者 Gmail 帳號的草稿匣，需要手動確認後送出。")
 
 
+def run_manager_summary(records):
+    """公司名單超過門檻（escalate）的交易，額外彙整成一封信給主管評估轉派，跟業務個人通知分開追蹤。"""
+    if not GMAIL_AUTO_NOTIFY_ENABLED:
+        return
+
+    log = load_draft_log()
+    manager_log = log.get(MANAGER_SUMMARY_LOG_KEY, {})
+    pending = []
+    for r in records:
+        if r["狀態"] != "escalate":
+            continue
+        entry = manager_log.get(r["id"])
+        if entry and entry.get("status") == r["狀態"]:
+            continue
+        pending.append(r)
+
+    if not pending:
+        print("沒有新的公司名單可轉派交易需要彙整給主管。")
+        return
+
+    try:
+        token = get_gmail_access_token()
+    except requests.exceptions.RequestException as e:
+        print(f"換 Gmail access token 失敗，本次略過主管彙整草稿（{e.__class__.__name__}）：{e}")
+        return
+
+    subject = f"【ZOHO交易階段提醒】公司名單可轉派彙整（共 {len(pending)} 筆）"
+    html_body = build_manager_summary_html(pending)
+    msg = build_mime_message(MANAGER_SUMMARY_EMAIL, subject, html_body)
+    try:
+        result = create_gmail_draft(token, msg)
+    except requests.exceptions.RequestException as e:
+        print(f"建立主管彙整草稿失敗（{e.__class__.__name__}）：{e}")
+        return
+
+    now_iso = datetime.now(TAIPEI_TZ).isoformat()
+    for r in pending:
+        manager_log[r["id"]] = {"status": r["狀態"], "drafted_at": now_iso, "draft_id": result.get("id")}
+    log[MANAGER_SUMMARY_LOG_KEY] = manager_log
+    save_draft_log(log)
+    print(f"已建立主管彙整草稿，共 {len(pending)} 筆公司名單可轉派交易，收件人 {MANAGER_SUMMARY_EMAIL}。")
+
+
 def main():
     token = get_access_token()
     rows = fetch_current_deals(token)
@@ -915,6 +1045,7 @@ def main():
         f.write(html_out)
 
     run_auto_notify(records)
+    run_manager_summary(records)
 
     print(f"完成。共 {len(records)} 筆，本次呼叫 Timeline API {api_calls} 次（快取命中 {len(rows) - api_calls} 筆）。")
 
