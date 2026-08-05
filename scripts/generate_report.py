@@ -91,8 +91,17 @@ ROSTER = {
     "jj.hsieh@cyberbiz.io": ("JJ Hsieh", "POS"),
     "jack.lin@cyberbiz.io": ("Jack Lin", "POS"),
     "chuan.luo@cyberbiz.io": ("Chuan Luo", "POS"),
+    "ellie.chu@cyberbiz.io": ("Ellie Chu", "業務一課"),
+    "sabrina.hua@cyberbiz.io": ("Sabrina Hua", "業務二課"),
+    "william.wang@cyberbiz.io": ("William Wang", "業務三課"),
+    "ambrose.tsai@cyberbiz.io": ("Ambrose Tsai", "Ambrose"),
 }
-TEAM_ORDER = ["業務一課", "業務二課", "業務三課", "業務四課", "POS", "其他(非本次組織名單內)"]
+TEAM_ORDER = ["業務一課", "業務二課", "業務三課", "業務四課", "POS", "Ambrose"]
+
+# 報表跟自動草稿都只處理 ROSTER 裡列出的這些人，Owner 不在上面這份名單裡的交易一律不會
+# 出現在報表或草稿裡（不是資料遺漏，是刻意過濾掉）。要放行更多人，把 email 加進 ROSTER 即可，
+# 不需要另外改這個過濾邏輯。
+ROSTER_ONLY_FILTER = True
 
 STAGES_TRACKED = ["公司名單", "本月有機會"]
 TRACK_SINCE = "2026-01-01T00:00:00+08:00"  # 只追蹤這個日期之後建立的交易，避免把歷史上所有卡在這兩階段的舊資料全抓進來
@@ -239,7 +248,11 @@ def fetch_current_deals(token):
         f"FROM Deals WHERE (Stage in ({stages_sql})) AND (Created_Time >= '{TRACK_SINCE}') "
         "ORDER BY Created_Time ASC"
     )
-    return coql_query(token, query)
+    rows = coql_query(token, query)
+    if ROSTER_ONLY_FILTER:
+        # 只留下 Owner 在 ROSTER 名單裡的交易，其他人的一律不進報表、也不會被自動草稿處理到。
+        rows = [r for r in rows if r.get("Owner.email") in ROSTER]
+    return rows
 
 
 def build_records(token, rows, cache):
