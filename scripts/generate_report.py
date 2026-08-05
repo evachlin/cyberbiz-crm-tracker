@@ -90,6 +90,7 @@ ROSTER = {
     "chris.zhong@cyberbiz.io": ("Chris Zhong", "業務三課"),
     "shelly.wang@cyberbiz.io": ("Shelly Wang", "業務三課"),
     "ryan.fang@cyberbiz.io": ("Ryan Fang", "業務三課"),
+    "hans.yu@cyberbiz.io": ("Hans Yu", "業務三課"),
     "chester.liao@cyberbiz.io": ("Chester Liao", "業務四課"),
     "francis.cheng@cyberbiz.io": ("Francis Cheng", "業務四課"),
     "calvin.chen@cyberbiz.io": ("Calvin Chen", "業務四課"),
