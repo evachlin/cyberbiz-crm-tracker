@@ -942,33 +942,77 @@ def save_draft_log(log):
         json.dump(log, f, ensure_ascii=False, indent=1)
 
 
-def build_notify_html(owner_name, deals):
-    """組出提醒信的 HTML 內容：Verdana 字體、階段資訊粗體、交易名稱本身是超連結。"""
-    items_html = []
-    for d in deals:
-        days_txt = "天數未知" if d["工作天數"] is None else f'已 {d["工作天數"]} {d["天數單位"]}'
+# 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
+# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
+_TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
+_TABLE_TOTAL_WIDTH = "640px"
+
+
+def _build_deals_table_html(deals):
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
+    w1, w2, w3, w4 = _TABLE_COL_WIDTHS
+    deals_sorted = sorted(
+        deals,
+        key=lambda d: -(d["工作天數"] if d["工作天數"] is not None else -1),
+    )
+    rows_html = []
+    for d in deals_sorted:
+        days_txt = "天數未知" if d["工作天數"] is None else f'{d["工作天數"]} {d["天數單位"]}'
         crm_url = f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}"
-        items_html.append(
-            '<li style="margin-bottom:8px;">'
-            f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a>'
-            f'　<b>（{esc(d["Stage"])}，{esc(days_txt)}，{esc(STATUS_LABEL[d["狀態"]])}）</b>'
-            '</li>'
+        rows_html.append(
+            "<tr>"
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;word-break:break-word;">'
+            f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a></td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(d["Stage"])}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(days_txt)}</td>'
+            f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(STATUS_LABEL[d["狀態"]])}</td>'
+            "</tr>"
         )
+    return f'''<table style="border-collapse:collapse;width:{_TABLE_TOTAL_WIDTH};table-layout:fixed;margin-bottom:18px;font-size:13px;">
+    <colgroup>
+      <col style="width:{w1};"><col style="width:{w2};"><col style="width:{w3};"><col style="width:{w4};">
+    </colgroup>
+    <thead>
+      <tr style="background:#f7f2e8;">
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
+      </tr>
+    </thead>
+    <tbody>
+      {"".join(rows_html)}
+    </tbody>
+  </table>'''
+
+
+_RULE_REMINDER_HTML = '''
+  <hr style="border:none;border-top:1px solid #dfd0ba;margin:16px 0;">
+  <p style="font-size:12px;color:#667085;">
+    小提醒，名單判斷規則：<br>
+    ・公司名單：進來後 7 天內要完成聯繫並調整階段<br>
+    ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核<br>
+    ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段
+  </p>'''
+
+
+def build_notify_html(owner_name, deals):
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。"""
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
   <p>{esc(owner_name)} 你好，</p>
   <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
-  <ul style="padding-left:20px;">
-    {"".join(items_html)}
-  </ul>
+  {_build_deals_table_html(deals)}
   <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
   <p>謝謝！</p>
+  {_RULE_REMINDER_HTML}
 </div>'''
 
 
 def build_manager_summary_html(deals):
     """公司名單可轉派彙整信：跨業務、跨課別，寄給主管評估是否轉派。
     依課別（TEAM_ORDER 的順序）分組，同課別裡再依業務姓名排序，
-    同一人底下的交易再依天數（多到少）排序，用表格呈現。"""
+    同一人底下的交易表格再依天數（多到少）排序，跟業務個人提醒信共用同一份表格欄寬設定。"""
     groups = defaultdict(list)
     for d in deals:
         groups[(d["業務課"], d["業務"] or "")].append(d)
@@ -979,38 +1023,9 @@ def build_manager_summary_html(deals):
     sections_html = []
     # 先依課別（照 TEAM_ORDER 的順序：業務一~四課、POS、Ambrose），同課別裡再依業務姓名排序。
     for (team, owner), owner_deals in sorted(groups.items(), key=lambda kv: (team_sort_key(kv[0][0]), kv[0][1])):
-        owner_deals = sorted(
-            owner_deals,
-            key=lambda d: -(d["工作天數"] if d["工作天數"] is not None else -1),
-        )
-        rows_html = []
-        for d in owner_deals:
-            days_txt = "天數未知" if d["工作天數"] is None else f'{d["工作天數"]} {d["天數單位"]}'
-            crm_url = f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}"
-            rows_html.append(
-                "<tr>"
-                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">'
-                f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a></td>'
-                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(d["Stage"])}</td>'
-                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(days_txt)}</td>'
-                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(STATUS_LABEL[d["狀態"]])}</td>'
-                "</tr>"
-            )
         sections_html.append(f'''
   <p style="margin-bottom:6px;"><b>{esc(team)} {esc(owner) or "（無業務資料）"}</b>（{len(owner_deals)} 筆）</p>
-  <table style="border-collapse:collapse;width:100%;margin-bottom:18px;font-size:13px;">
-    <thead>
-      <tr style="background:#f7f2e8;">
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
-      </tr>
-    </thead>
-    <tbody>
-      {"".join(rows_html)}
-    </tbody>
-  </table>''')
+  {_build_deals_table_html(owner_deals)}''')
 
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
   <p>Ambrose 你好，</p>
