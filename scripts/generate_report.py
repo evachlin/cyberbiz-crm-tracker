@@ -450,7 +450,6 @@ REPORT_SCRIPT = '''<script>
 (function () {
   var STORE_KEY = "cyberbiz_notified_v1";
   var activeTeam = "all";
-  var onlyUrgent = false;
   var sortKey = null;
   var sortDir = 1;
 
@@ -499,6 +498,18 @@ REPORT_SCRIPT = '''<script>
     var btn = document.getElementById("notifyBtn");
     btn.textContent = "寄送提醒信（已勾選 " + checked.length + " 筆）";
     btn.disabled = checked.length === 0;
+
+    var selectAll = document.getElementById("selectAllBox");
+    if (selectAll) {
+      var visible = document.querySelectorAll(".notify-box");
+      if (visible.length === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+      } else {
+        selectAll.checked = checked.length === visible.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < visible.length;
+      }
+    }
   }
 
   function buildGmailUrl(ownerEmail, ownerName, deals) {
@@ -559,7 +570,6 @@ REPORT_SCRIPT = '''<script>
     var notified = loadNotified();
     var data = REPORT_ROWS.filter(function (r) {
       if (activeTeam !== "all" && r.team !== activeTeam) return false;
-      if (onlyUrgent && r.priority !== 0) return false;
       return true;
     });
     if (sortKey) {
@@ -631,15 +641,25 @@ REPORT_SCRIPT = '''<script>
     document.getElementById("filters").addEventListener("click", function (e) {
       var btn = e.target.closest(".chip-btn");
       if (!btn) return;
-      if (btn.dataset.urgent) {
-        onlyUrgent = !onlyUrgent;
-        btn.classList.toggle("active", onlyUrgent);
+      // 沒有「全部」按鈕了：再點一次目前已選的課別，就會取消選取、回到顯示全部課別。
+      if (activeTeam === btn.dataset.team) {
+        activeTeam = "all";
+        btn.classList.remove("active");
       } else {
         activeTeam = btn.dataset.team;
         document.querySelectorAll(".chip-btn[data-team]").forEach(function (b) { b.classList.toggle("active", b === btn); });
       }
       renderTable();
     });
+    var selectAllBox = document.getElementById("selectAllBox");
+    if (selectAllBox) {
+      selectAllBox.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var check = selectAllBox.checked;
+        document.querySelectorAll(".notify-box").forEach(function (b) { b.checked = check; });
+        updateToolbar();
+      });
+    }
     document.querySelectorAll("th[data-sort]").forEach(function (th) {
       th.addEventListener("click", function () {
         var key = th.dataset.sort;
@@ -666,8 +686,9 @@ def fmt_amount(v):
 
 
 def render_html(records, generated_at):
+    # 傳進來的 records 在 main() 就已經先篩過，只剩下滿足三個門檻條件（可轉派／
+    # 月底檢核逾期／短期追蹤逾期）的交易，正常天數的不會出現在這份報表裡。
     stage_counter = Counter(r["Stage"] for r in records)
-    urgent_count = sum(1 for r in records if r["狀態"] in URGENT_STATUSES)
     teams_present = [t for t in TEAM_ORDER if any(r["業務課"] == t for r in records)]
 
     # 預設排序：緊急程度優先，同層再依天數從多到少（使用者點欄位標題可以在網頁上重新排序）
@@ -779,7 +800,10 @@ def render_html(records, generated_at):
   .chip-btn{{border:1px solid var(--line); background:#fffdf8; color:var(--forest); font-size:12px; font-weight:700;
     padding:7px 14px; border-radius:999px; cursor:pointer; font-family:inherit;}}
   .chip-btn.active{{background:var(--forest); color:#fff8ea; border-color:var(--forest);}}
-  .chip-btn.urgent-toggle.active{{background:var(--coral); border-color:var(--coral);}}
+
+  .sticky-panel{{position:sticky; top:0; z-index:40; background:var(--paper);
+    padding-top:14px; padding-bottom:2px; box-shadow:0 10px 16px -6px rgba(48,38,22,.22);}}
+  .sticky-panel .stat-grid{{margin-top:0;}}
 
   .table-wrap{{margin:0 24px; overflow-x:auto; border-radius:16px; box-shadow:var(--shadow);}}
   table{{width:100%; border-collapse:collapse; background:var(--card); min-width:680px;}}
@@ -812,22 +836,26 @@ def render_html(records, generated_at):
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
   <h1>公司名單 / 本月有機會 / 短期追蹤 階段追蹤</h1>
-  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose）｜上方可依課別篩選、只看需優先處理，點欄位標題可排序｜公司名單規則：第 {COMPANY_LIST_REMIND_DAY}/{COMPANY_LIST_ESCALATE_DAY} 個工作天提醒／可轉派｜本月有機會規則：第 {OPPORTUNITY_MIDCHECK_DAY}/{OPPORTUNITY_ENDCHECK_DAY} 個工作天月中／月底檢核｜短期追蹤規則：超過 {SHORT_TERM_ESCALATE_DAYS} 天標記需優先處理</div>
-  <div class="stat-line">共 {len(records)} 筆（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
+  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期</div>
+  <div class="stat-line">共 {len(records)} 筆需優先處理（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
 </div>
-<div class="stat-grid">
-  <div class="stat-box"><div class="num">{len(records)}</div><div class="lbl">追蹤中總筆數</div></div>
-  <div class="stat-box"><div class="num">{stage_counter.get("公司名單",0)}</div><div class="lbl">公司名單</div></div>
-  <div class="stat-box"><div class="num">{stage_counter.get("本月有機會",0)}</div><div class="lbl">本月有機會</div></div>
-  <div class="stat-box"><div class="num">{stage_counter.get("短期追蹤",0)}</div><div class="lbl">短期追蹤</div></div>
-  <div class="stat-box"><div class="num">{urgent_count}</div><div class="lbl">已超過門檻，需優先處理</div></div>
-</div>
-<div class="notify-toolbar">
-  <button class="notify-btn-primary" id="notifyBtn" disabled>寄送提醒信（已勾選 0 筆）</button>
-  <button class="notify-btn-secondary" id="clearCheckBtn">清除勾選</button>
-  <button class="notify-btn-secondary" id="toggleLogBtn">查看通知記錄</button>
-  <button class="notify-btn-secondary" id="clearNotifiedBtn">清除本機已通知記錄</button>
-  <span class="notify-count" id="notifyHint">勾選左側框，可以一次對多位不同業務寄出各自的提醒信（每人一封，只列出他自己被勾選的交易）。「已通知」標記跟通知記錄都只存在這台瀏覽器裡，換裝置不會同步。</span>
+<div class="sticky-panel">
+  <div class="stat-grid">
+    <div class="stat-box"><div class="num">{len(records)}</div><div class="lbl">需優先處理總筆數</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get("公司名單",0)}</div><div class="lbl">公司名單可轉派</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get("本月有機會",0)}</div><div class="lbl">本月有機會月底逾期</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get("短期追蹤",0)}</div><div class="lbl">短期追蹤逾期</div></div>
+  </div>
+  <div class="notify-toolbar">
+    <button class="notify-btn-primary" id="notifyBtn" disabled>寄送提醒信（已勾選 0 筆）</button>
+    <button class="notify-btn-secondary" id="clearCheckBtn">清除勾選</button>
+    <button class="notify-btn-secondary" id="toggleLogBtn">查看通知記錄</button>
+    <button class="notify-btn-secondary" id="clearNotifiedBtn">清除本機已通知記錄</button>
+    <span class="notify-count" id="notifyHint">勾選左側框，可以一次對多位不同業務寄出各自的提醒信（每人一封，只列出他自己被勾選的交易）。「已通知」標記跟通知記錄都只存在這台瀏覽器裡，換裝置不會同步。</span>
+  </div>
+  <div class="filters" id="filters">
+    {team_filter_buttons}
+  </div>
 </div>
 <div class="notify-log-panel" id="notifyLogPanel" style="display:none">
   <div class="notify-log-title">通知記錄（存在這台瀏覽器裡）</div>
@@ -839,16 +867,11 @@ def render_html(records, generated_at):
     </table>
   </div>
 </div>
-<div class="filters" id="filters">
-  <button class="chip-btn active" data-team="all">全部</button>
-  <button class="chip-btn urgent-toggle" data-urgent="1">只看需優先處理</button>
-  {team_filter_buttons}
-</div>
 <div class="table-wrap">
   <table>
     <thead>
       <tr>
-        <th class="no-sort"></th>
+        <th class="no-sort"><input type="checkbox" id="selectAllBox" title="全選目前畫面上的交易"></th>
         <th data-sort="priority">狀態</th>
         <th data-sort="name">交易名稱</th>
         <th data-sort="team">課別</th>
@@ -1075,8 +1098,13 @@ def main():
     records, new_cache, api_calls = build_records(token, rows, cache)
     save_cache(new_cache)
 
+    # 快取／自動草稿仍然要看「全部」記錄（追蹤中但天數還沒到門檻的也要一起處理，
+    # 這樣快取才不會漏、之後一旦超過門檻才能馬上被抓到），但網頁報表本身只列出
+    # 已經滿足三個門檻條件（可轉派／月底檢核／短期追蹤逾期）的交易，正常天數的不顯示。
+    report_records = [r for r in records if r["狀態"] in URGENT_STATUSES]
+
     generated_at = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M (UTC+8)")
-    html_out = render_html(records, generated_at)
+    html_out = render_html(report_records, generated_at)
 
     os.makedirs(os.path.dirname(OUTPUT_HTML_PATH), exist_ok=True)
     with open(OUTPUT_HTML_PATH, "w", encoding="utf-8") as f:
