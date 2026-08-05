@@ -201,7 +201,7 @@ def get_timeline(token, record_id, module="Deals", max_pages=10):
             break
         resp.raise_for_status()
         result = resp.json()
-        page_items = result.get("__timeline", [])
+        page_items = result.get("__timeline") or []
         if not page_items:
             break
         items.extend(page_items)
@@ -224,7 +224,9 @@ def find_stage_entry_time(token, record_id, target_stage, created_time):
     except requests.HTTPError:
         return created_time, "無法讀取階段歷史，暫以建立時間估算"
     for item in timeline:
-        for change in item.get("field_history", []):
+        # 有些 timeline 事件（例如新增 Task/Note）field_history 這個鍵存在但值是 null，
+        # 不是缺少這個鍵，用 .get(key, []) 接不住 None，要用 "or []" 才保險。
+        for change in item.get("field_history") or []:
             if change.get("api_name") == "Stage":
                 new_val = (change.get("_value") or {}).get("new")
                 if new_val == target_stage:
