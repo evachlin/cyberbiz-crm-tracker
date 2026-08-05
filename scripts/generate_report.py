@@ -325,7 +325,9 @@ STATUS_PRIORITY = {
 
 
 # ---------------------------------------------------------------------------
-# 勾選寄信提醒功能（純前端，mailto: 開啟本機信箱，不會自動送出，也不需要任何伺服器）
+# 勾選寄信提醒功能（純前端，開新分頁到 Gmail 網頁版寫信畫面，不會自動送出，也不需要任何伺服器。
+# 原本用 mailto: 連結，但公司網域管理的 Chrome 設定檔會鎖掉「預設信箱處理常式」權限，
+# 導致完全沒反應也不會跳錯誤，所以改成直接用 Gmail 的寫信網址，不需要任何協定權限。）
 # 「已通知」標記存在瀏覽器 localStorage，只在同一台裝置/瀏覽器有效，不會跨裝置同步、
 # 也不會寫回 Zoho 或 GitHub（那需要後端，目前先不做，見 README）。
 # ---------------------------------------------------------------------------
@@ -405,8 +407,13 @@ NOTIFY_SCRIPT = '''<script>
     });
     lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
-    return "mailto:" + encodeURIComponent(ownerEmail) +
-      "?subject=" + encodeURIComponent(subject) +
+    // 改用 Gmail 網頁版的寫信網址，而不是 mailto:。
+    // mailto: 需要瀏覽器/系統註冊「預設信箱處理常式」才會有反應，
+    // 公司網域管理的 Chrome 設定檔常常直接鎖掉這個權限，導致完全沒反應也不會有錯誤訊息。
+    // Gmail 的網頁版寫信網址就是一般網址，不需要任何協定權限，開起來最穩。
+    return "https://mail.google.com/mail/?view=cm&fs=1&tf=1" +
+      "&to=" + encodeURIComponent(ownerEmail) +
+      "&su=" + encodeURIComponent(subject) +
       "&body=" + encodeURIComponent(body);
   }
 
@@ -432,13 +439,9 @@ NOTIFY_SCRIPT = '''<script>
         return;
       }
       var url = buildMailto(g.email, g.owner, g.deals);
-      // 直接同步開啟（不要用 setTimeout 延遲），才能保留「這是使用者剛剛點擊」的狀態，
-      // 否則瀏覽器會判斷不出這是使用者操作，導致開出一片空白、也不會跳出用哪個信箱開的詢問視窗。
-      if (idx === 0) {
-        window.location.href = url;
-      } else {
-        window.open(url, "_blank");
-      }
+      // 開新分頁到 Gmail 寫信畫面。維持同步呼叫（不要用 setTimeout 延遲），
+      // 這樣瀏覽器才會判斷這是使用者剛剛點擊觸發的動作，不會被彈跳視窗攔截器擋掉。
+      window.open(url, "_blank");
       g.deals.forEach(function (d) {
         map[d.id] = {
           date: todayStr(), ts: Date.now(),
