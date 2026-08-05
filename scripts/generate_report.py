@@ -167,18 +167,36 @@ def coql_query(token, select_query):
     return rows
 
 
-def get_timeline(token, record_id, module="Deals"):
+def get_timeline(token, record_id, module="Deals", max_pages=10):
+    """
+    抓 Timeline，會翻頁抓到 max_pages 頁為止（不是只抓第一頁）。
+    原本只抓第一頁，如果一筆交易在真正變更階段之後又發生其他異動（備註、欄位編輯等），
+    那些異動會排在階段變更前面，可能把真正的階段變更記錄擠到後面幾頁而漏掉 ——
+    這正是曾經導致某些交易錯誤退回用建立時間估算的原因，加翻頁修正。
+    """
     url = f"{API_DOMAIN}/crm/{API_VERSION}/{module}/{record_id}/__timeline"
-    resp = requests.get(
-        url,
-        headers=zoho_headers(token),
-        params={"sort_by": "audited_time", "sort_order": "desc", "include_inner_details": "true"},
-        timeout=15,  # 縮短逾時時間，避免少數幾筆卡住拖慢整體（原本 30 秒，第一次全量跑會被放大很多倍）
-    )
-    if resp.status_code == 204:
-        return []
-    resp.raise_for_status()
-    return resp.json().get("data", [])
+    items = []
+    page_token = None
+    for _ in range(max_pages):
+        params = {"sort_by": "audited_time", "sort_order": "desc", "include_inner_details": "true", "per_page": 200}
+        if page_token:
+            params["page_token"] = page_token
+        resp = requests.get(url, headers=zoho_headers(token), params=params, timeout=15)
+        if resp.status_code == 204:
+            break
+        resp.raise_for_status()
+        result = resp.json()
+        page_items = result.get("data", [])
+        if not page_items:
+            break
+        items.extend(page_items)
+        info = result.get("info", {})
+        if not info.get("more_records"):
+            break
+        page_token = info.get("next_page_token")
+        if not page_token:
+            break
+    return items
 
 
 def find_stage_entry_time(token, record_id, target_stage, created_time):
@@ -289,7 +307,10 @@ def build_records(token, rows, cache):
         stage = r["Stage"]
         cached = cache.get(rid)
 
-        if cached and cached.get("stage") == stage and cached.get("entered_at"):
+        # 只有「乾淨命中 Timeline 記錄」（note 是 None）才信任快取；
+        # 如果快取裡的是退回估算值（note 有內容），代表當初沒查到真正的階段變更時間，
+        # 不能永久鎖死，每次都要重查，直到查到真正的 Timeline 記錄為止（自我修正）。
+        if cached and cached.get("stage") == stage and cached.get("entered_at") and cached.get("note") is None:
             entered_at = cached["entered_at"]
             note = cached.get("note")
         else:
