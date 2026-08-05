@@ -960,6 +960,13 @@ def build_notify_html(owner_name, deals):
   </ul>
   <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
   <p>謝謝！</p>
+<hr style="border:none;border-top:1px solid #dfd0ba;margin:16px 0;">
+  <p style="font-size:12px;color:#667085;">
+    小提醒，名單判斷規則：<br>
+    ・公司名單：進來後 3 天內要完成聯繫並調整階段<br>
+    ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核<br>
+    ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段
+  </p>
 </div>'''
 
 
