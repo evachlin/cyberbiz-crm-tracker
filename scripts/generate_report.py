@@ -120,6 +120,12 @@ OPPORTUNITY_ENDCHECK_DAY = 22    # 月底檢核
 # 短期追蹤：只有一個門檻，用「日曆天」算（不是工作天），超過就標記需優先處理
 SHORT_TERM_ESCALATE_DAYS = 90
 
+# 重複提醒：交易進入某個「需優先處理」狀態後，如果業務一直沒處理、狀態也沒變，
+# 隔幾天要再提醒一次（不然預設只會提醒一次，之後不管拖多久都不會再收到信）。
+# 三個階段（公司名單可轉派／本月有機會月底檢核逾期／短期追蹤逾期）共用同一個間隔，
+# 用「距離上次建立草稿的日曆天數」判斷，跟工作天／日曆天的天數計算方式無關。
+REMIND_REPEAT_DAYS = 7
+
 
 # ---------------------------------------------------------------------------
 # Zoho API 基礎函式
@@ -1001,19 +1007,45 @@ def create_gmail_draft(token, msg):
     return resp.json()
 
 
+def should_send_reminder(entry, current_status, now):
+    """
+    判斷這筆交易現在要不要（再）建立一封提醒草稿。
+    - 之前從沒建過草稿：要建。
+    - 狀態變了（例如本月有機會從月中檢核變月底檢核）：一定要重新建一次，不管天數。
+    - 狀態沒變，但距離上次建立草稿已經超過 REMIND_REPEAT_DAYS 天，業務還是沒處理：重複提醒一次。
+    - 狀態沒變、也還沒到重複提醒的天數：不用再建，避免同一件事每天疲勞轟炸。
+    """
+    if not entry:
+        return True
+    if entry.get("status") != current_status:
+        return True
+    drafted_at = entry.get("drafted_at")
+    if not drafted_at:
+        return True
+    try:
+        last_dt = datetime.fromisoformat(drafted_at)
+    except ValueError:
+        return True
+    if last_dt.tzinfo is None:
+        last_dt = last_dt.replace(tzinfo=TAIPEI_TZ)
+    days_since = (now - last_dt).total_seconds() / 86400
+    return days_since >= REMIND_REPEAT_DAYS
+
+
 def run_auto_notify(records):
     if not GMAIL_AUTO_NOTIFY_ENABLED:
         print("尚未設定 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN，略過自動建立提醒草稿功能。")
         return
 
     log = load_draft_log()
+    now = datetime.now(TAIPEI_TZ)
     by_owner = defaultdict(list)
     for r in records:
         if r["狀態"] not in URGENT_STATUSES:
             continue
         entry = log.get(r["id"])
-        if entry and entry.get("status") == r["狀態"]:
-            continue  # 這筆交易在目前這個狀態已經建過草稿了，不重複建立
+        if not should_send_reminder(entry, r["狀態"], now):
+            continue  # 狀態沒變，而且還沒到重複提醒的天數，不用再建
         by_owner[(r["業務Email"], r["業務"])].append(r)
 
     if not by_owner:
@@ -1055,12 +1087,13 @@ def run_manager_summary(records):
 
     log = load_draft_log()
     manager_log = log.get(MANAGER_SUMMARY_LOG_KEY, {})
+    now = datetime.now(TAIPEI_TZ)
     pending = []
     for r in records:
         if r["狀態"] != "escalate":
             continue
         entry = manager_log.get(r["id"])
-        if entry and entry.get("status") == r["狀態"]:
+        if not should_send_reminder(entry, r["狀態"], now):
             continue
         pending.append(r)
 
