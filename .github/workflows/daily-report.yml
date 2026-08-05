@@ -35,6 +35,7 @@ jobs:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          MANAGER_SUMMARY_EMAIL: ${{ secrets.MANAGER_SUMMARY_EMAIL }}
         run: python scripts/generate_report.py
 
       - name: Commit updated report
