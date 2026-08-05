@@ -19,14 +19,22 @@ CYBERBIZ Zoho CRM 每日自動化報表
   ZOHO_REFRESH_TOKEN
   ZOHO_ACCOUNTS_DOMAIN   (預設 https://accounts.zoho.com，中國資料中心用 .com.cn，歐洲用 .eu，印度用 .in)
   ZOHO_API_DOMAIN        (預設 https://www.zohoapis.com，需跟 ACCOUNTS_DOMAIN 對應的資料中心一致)
+
+  以下 3 個是「自動建立 Gmail 提醒草稿」功能用的，選填 —— 沒設定的話這功能會自動跳過，
+  不影響報表本身照常產生。設定方式見 README「自動寄信提醒（Gmail 草稿）」章節。
+  GMAIL_CLIENT_ID
+  GMAIL_CLIENT_SECRET
+  GMAIL_REFRESH_TOKEN
 """
 
+import base64
 import os
 import json
 import html
 import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict, Counter
+from email.message import EmailMessage
 
 import requests
 
@@ -45,8 +53,18 @@ API_VERSION = "v8"
 ZOHO_CRM_WEB_DOMAIN = os.environ.get("ZOHO_CRM_WEB_DOMAIN", "https://crm.zoho.com")
 ZOHO_CRM_ORG_ID = os.environ.get("ZOHO_CRM_ORG_ID", "org695870979")
 
+# Gmail API（自動建立提醒草稿用，選填）。三個都設定了才會啟用，任一沒填就自動跳過這個功能。
+GMAIL_CLIENT_ID = os.environ.get("GMAIL_CLIENT_ID", "")
+GMAIL_CLIENT_SECRET = os.environ.get("GMAIL_CLIENT_SECRET", "")
+GMAIL_REFRESH_TOKEN = os.environ.get("GMAIL_REFRESH_TOKEN", "")
+GMAIL_AUTO_NOTIFY_ENABLED = bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN)
+# 目前只對「可轉派」「月底檢核」這兩個最緊急的狀態自動建草稿，其餘狀態維持只顯示在網頁上，
+# 不自動發信提醒，避免信件太多、太早通知造成干擾。要調整範圍就改這個 tuple。
+AUTO_NOTIFY_STATUSES = ("escalate", "endcheck")
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_PATH = os.path.join(REPO_ROOT, "data", "stage_cache.json")
+DRAFT_LOG_PATH = os.path.join(REPO_ROOT, "data", "gmail_draft_log.json")
 OUTPUT_HTML_PATH = os.path.join(REPO_ROOT, "docs", "index.html")
 
 # ---------------------------------------------------------------------------
@@ -735,6 +753,140 @@ def render_html(records, generated_at):
 </html>'''
 
 
+# ---------------------------------------------------------------------------
+# Gmail API：自動幫「可轉派／月底檢核」的交易建立提醒信草稿（存在寄件者自己的 Gmail 草稿匣，
+# 不會自動送出）。三個 GMAIL_* secret 沒設定的話，這整個功能會自動跳過，report 照常產生。
+#
+# 未來如果要改成「不用人工按送出，系統自己直接寄出」：
+#   1. Google Cloud OAuth 同意畫面的 Gmail API 授權範圍要從 gmail.compose 改成 gmail.send
+#      （或兩個都加），並重新走一次授權流程拿新的 refresh token。
+#   2. create_gmail_draft() 呼叫的網址從 .../drafts 改成 .../messages/send，
+#      body 一樣是 {"raw": ...}，不需要再包一層 "message"。
+#   其餘（HTML 信件內容、分組邏輯、避免重複寄送的紀錄檔）都不用改，是同一套。
+# ---------------------------------------------------------------------------
+def get_gmail_access_token():
+    resp = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "client_id": GMAIL_CLIENT_ID,
+            "client_secret": GMAIL_CLIENT_SECRET,
+            "refresh_token": GMAIL_REFRESH_TOKEN,
+            "grant_type": "refresh_token",
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if "access_token" not in data:
+        raise RuntimeError(f"換 Gmail access token 失敗：{data}")
+    return data["access_token"]
+
+
+def load_draft_log():
+    if os.path.exists(DRAFT_LOG_PATH):
+        with open(DRAFT_LOG_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_draft_log(log):
+    os.makedirs(os.path.dirname(DRAFT_LOG_PATH), exist_ok=True)
+    with open(DRAFT_LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(log, f, ensure_ascii=False, indent=1)
+
+
+def build_notify_html(owner_name, deals):
+    """組出提醒信的 HTML 內容：Verdana 字體、階段資訊粗體、交易名稱本身是超連結。"""
+    items_html = []
+    for d in deals:
+        days_txt = "天數未知" if d["工作天數"] is None else f'已 {d["工作天數"]} 個工作天'
+        stage_tag = "公司名單" if d["Stage"] == "公司名單" else "本月有機會"
+        crm_url = f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}"
+        items_html.append(
+            '<li style="margin-bottom:8px;">'
+            f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a>'
+            f'　<b>（{esc(stage_tag)}，{esc(days_txt)}，{esc(STATUS_LABEL[d["狀態"]])}）</b>'
+            '</li>'
+        )
+    return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
+  <p>{esc(owner_name)} 你好，</p>
+  <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
+  <ul style="padding-left:20px;">
+    {"".join(items_html)}
+  </ul>
+  <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
+  <p>謝謝！</p>
+</div>'''
+
+
+def build_mime_message(to_email, subject, html_body):
+    msg = EmailMessage()
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content("這封信包含 HTML 格式，請用支援 HTML 的信箱檢視。")
+    msg.add_alternative(html_body, subtype="html")
+    return msg
+
+
+def create_gmail_draft(token, msg):
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
+    resp = requests.post(
+        "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"message": {"raw": raw}},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def run_auto_notify(records):
+    if not GMAIL_AUTO_NOTIFY_ENABLED:
+        print("尚未設定 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN，略過自動建立提醒草稿功能。")
+        return
+
+    log = load_draft_log()
+    by_owner = defaultdict(list)
+    for r in records:
+        if r["狀態"] not in AUTO_NOTIFY_STATUSES:
+            continue
+        entry = log.get(r["id"])
+        if entry and entry.get("status") == r["狀態"]:
+            continue  # 這筆交易在目前這個狀態已經建過草稿了，不重複建立
+        by_owner[(r["業務Email"], r["業務"])].append(r)
+
+    if not by_owner:
+        print("沒有新的可轉派／月底檢核交易需要建立提醒草稿。")
+        return
+
+    try:
+        token = get_gmail_access_token()
+    except requests.exceptions.RequestException as e:
+        print(f"換 Gmail access token 失敗，本次略過自動草稿功能（{e.__class__.__name__}）：{e}")
+        return
+
+    created = 0
+    now_iso = datetime.now(TAIPEI_TZ).isoformat()
+    for (owner_email, owner_name), deals in by_owner.items():
+        if not owner_email:
+            print(f"{owner_name} 沒有 email，略過自動草稿，請手動聯絡。")
+            continue
+        subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
+        html_body = build_notify_html(owner_name, deals)
+        msg = build_mime_message(owner_email, subject, html_body)
+        try:
+            result = create_gmail_draft(token, msg)
+        except requests.exceptions.RequestException as e:
+            print(f"幫 {owner_name} 建立提醒草稿失敗（{e.__class__.__name__}）：{e}")
+            continue
+        created += 1
+        for d in deals:
+            log[d["id"]] = {"status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id")}
+
+    save_draft_log(log)
+    print(f"本次共建立 {created} 封提醒草稿，存在寄件者 Gmail 帳號的草稿匣，需要手動確認後送出。")
+
+
 def main():
     token = get_access_token()
     rows = fetch_current_deals(token)
@@ -748,6 +900,8 @@ def main():
     os.makedirs(os.path.dirname(OUTPUT_HTML_PATH), exist_ok=True)
     with open(OUTPUT_HTML_PATH, "w", encoding="utf-8") as f:
         f.write(html_out)
+
+    run_auto_notify(records)
 
     print(f"完成。共 {len(records)} 筆，本次呼叫 Timeline API {api_calls} 次（快取命中 {len(rows) - api_calls} 筆）。")
 
