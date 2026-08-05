@@ -65,9 +65,9 @@ Settings → Pages，Source 選 “Deploy from a branch”，Branch 選你的主
 信件範本文字寫在 scripts/generate_report.py 的 REPORT_SCRIPT（buildGmailUrl 那段），要調整語氣或內容直接改那裡的字串即可。
 
 自動寄信提醒（Gmail 草稿）
-這是選填功能：每天 Actions 跑完報表後，會自動幫「可轉派」「月底檢核」「短期追蹤逾期」這三個最緊急狀態的交易，依業務分組各建一封 HTML 格式的提醒信草稿，放進你自己 Gmail 帳號的草稿匣（不是業務本人的信箱，因為我們只授權了你自己的帳號）。你每天早上打開 Gmail 草稿匣，逐一看過沒問題後手動按送出即可。同一筆交易同一個狀態只會建立一次草稿，不會每天重複產生。要調整觸發範圍，改 scripts/generate_report.py 裡的 URGENT_STATUSES 常數即可。
+這是選填功能：每天 Actions 跑完報表後，會自動幫「可轉派」「月底檢核」「短期追蹤逾期」這三個最緊急狀態的交易，依業務分組各建一封 HTML 格式的提醒信草稿，放進你自己 Gmail 帳號的草稿匣（不是業務本人的信箱，因為我們只授權了你自己的帳號）。你每天早上打開 Gmail 草稿匣，逐一看過沒問題後手動按送出即可。同一筆交易只要狀態沒變，7 天內不會重複建立草稿；但如果業務放著超過 7 天都沒處理，會再重複提醒一次，直到狀態改變（例如業務更新了階段）為止，避免石沉大海。重複提醒的間隔可以改 scripts/generate_report.py 裡的 REMIND_REPEAT_DAYS 常數；要調整觸發範圍，改 URGENT_STATUSES 常數即可。
 
-另外還有一份主管彙整信：所有「公司名單」超過 3 個工作天（escalate 狀態）的交易，不管是誰名下的，會另外彙整成一封信寄給 MANAGER_SUMMARY_EMAIL（預設是 Ambrose Tsai，ambrose.tsai@cyberbiz.io），讓主管評估這幾筆是不是要轉派給別的業務。這封信跟業務個人的提醒信是分開追蹤、分開建立的，不會互相影響；同一筆交易一樣只會被彙整一次，不會重複出現。要換收件人，改 GitHub Secret MANAGER_SUMMARY_EMAIL（或直接改程式碼裡的預設值）即可，不用重新走 OAuth 流程。
+另外還有一份主管彙整信：所有「公司名單」超過 3 個工作天（escalate 狀態）的交易，不管是誰名下的，會另外彙整成一封信寄給 MANAGER_SUMMARY_EMAIL（預設是 Ambrose Tsai，ambrose.tsai@cyberbiz.io），讓主管評估這幾筆是不是要轉派給別的業務。這封信跟業務個人的提醒信是分開追蹤、分開建立的，不會互相影響；一樣是狀態不變的話 7 天內不重複彙整，超過 7 天還沒處理會再彙整一次。要換收件人，改 GitHub Secret MANAGER_SUMMARY_EMAIL（或直接改程式碼裡的預設值）即可，不用重新走 OAuth 流程。
 
 沒設定下面這三組 Secret 的話，這個功能會自動跳過，完全不影響報表本身正常產生，你可以先不做這一段，之後想要了再回來設定。
 
