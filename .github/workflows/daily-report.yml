@@ -32,12 +32,15 @@ jobs:
           ZOHO_REFRESH_TOKEN: ${{ secrets.ZOHO_REFRESH_TOKEN }}
           ZOHO_ACCOUNTS_DOMAIN: ${{ secrets.ZOHO_ACCOUNTS_DOMAIN }}
           ZOHO_API_DOMAIN: ${{ secrets.ZOHO_API_DOMAIN }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
         run: python scripts/generate_report.py
 
       - name: Commit updated report
         run: |
           git config user.name "cyberbiz-report-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add docs/index.html data/stage_cache.json
+          git add docs/index.html data/stage_cache.json data/gmail_draft_log.json
           git diff --quiet --cached || git commit -m "chore: 每日自動更新報表 $(date -u +'%Y-%m-%d %H:%M UTC')"
           git push
