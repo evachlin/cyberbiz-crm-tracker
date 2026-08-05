@@ -99,7 +99,7 @@ scripts/generate_report.py 裡 create_gmail_draft() 呼叫的網址從 .../draft
 
 已知限制
 工作天目前只排除週末，還沒排除國定假日/補班日。
-「其他(非本次組織名單內)」分組代表 Owner 不在目前提供的一~四課/POS 名單裡（例如開店顧問、SA 等角色），不是資料遺漏。
+報表跟自動草稿都只處理 ROSTER 名單裡列出的人（業務一~四課、POS，加上 Ambrose、Ellie、Sabrina、William）。Owner 不在名單裡的交易會被整筆過濾掉，不會出現在網頁或草稿裡，不是資料遺漏。要新增/移除誰，改 scripts/generate_report.py 裡的 ROSTER 字典即可。
 這份報表看的是「即時的 Stage 現況」，不是歷史存檔；如果要留存每一天的歷史快照，可以另外把每天的 docs/index.html 或原始資料存到帶日期的檔名裡。
 自動 Gmail 草稿是建立在你自己授權的那個 Gmail 帳號的草稿匣裡，收件人（To）雖然填的是業務本人，但草稿本身不會出現在業務自己的信箱，需要你手動打開、確認、按送出，這才算真的寄出去。
 
