@@ -943,14 +943,14 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
 
 
 def _build_deals_table_html(deals):
-    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／天數／規則），依天數多到少排序。"""
     w1, w2, w3, w4 = _TABLE_COL_WIDTHS
     deals_sorted = sorted(
         deals,
@@ -977,7 +977,7 @@ def _build_deals_table_html(deals):
       <tr style="background:#f7f2e8;">
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
       </tr>
     </thead>
@@ -991,14 +991,14 @@ _RULE_REMINDER_HTML = '''
   <hr style="border:none;border-top:1px solid #dfd0ba;margin:16px 0;">
   <p style="font-size:12px;color:#667085;">
     小提醒，名單判斷規則：<br>
-    ・公司名單：進來後 7 天內要完成聯繫並調整階段<br>
+    ・公司名單：進來後 3 天內要完成聯繫並調整階段<br>
     ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核<br>
     ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段
   </p>'''
 
 
 def build_notify_html(owner_name, deals):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。"""
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。"""
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
   <p>{esc(owner_name)} 你好，</p>
   <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
