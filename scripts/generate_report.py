@@ -126,7 +126,7 @@ SHORT_TERM_ESCALATE_DAYS = 90
 # 業務個人提醒信（三個階段共用）跟寄給主管的公司名單彙整信，用不同的重複間隔：
 # 業務個人的怕太頻繁疲乏，7 天一次；主管彙整信跟主管討論過，希望更緊盯轉派決策，改成 2 天一次。
 # 都是用「距離上次建立草稿的日曆天數」判斷，跟工作天／日曆天的天數計算方式無關。
-REMIND_REPEAT_DAYS = 7
+REMIND_REPEAT_DAYS = 3
 MANAGER_SUMMARY_REMIND_REPEAT_DAYS = 2
 
 
@@ -529,7 +529,7 @@ REPORT_SCRIPT = '''<script>
       lines.push("・" + d.name + "（" + d.stage + "，" + daysText(d) + "，" + d.statusLabel + "）");
       lines.push("   點我開啟這筆交易：" + d.crmUrl);
     });
-    lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
+    lines.push("", "如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
     // Gmail 網頁版的寫信網址，不是 mailto:（mailto 需要瀏覽器/系統註冊處理常式，
     // 公司網域管理的 Chrome 設定檔常常鎖掉這個權限，導致完全沒反應）。
