@@ -122,9 +122,11 @@ SHORT_TERM_ESCALATE_DAYS = 90
 
 # 重複提醒：交易進入某個「需優先處理」狀態後，如果業務一直沒處理、狀態也沒變，
 # 隔幾天要再提醒一次（不然預設只會提醒一次，之後不管拖多久都不會再收到信）。
-# 三個階段（公司名單可轉派／本月有機會月底檢核逾期／短期追蹤逾期）共用同一個間隔，
-# 用「距離上次建立草稿的日曆天數」判斷，跟工作天／日曆天的天數計算方式無關。
+# 業務個人提醒信（三個階段共用）跟寄給主管的公司名單彙整信，用不同的重複間隔：
+# 業務個人的怕太頻繁疲乏，7 天一次；主管彙整信跟主管討論過，希望更緊盯轉派決策，改成 2 天一次。
+# 都是用「距離上次建立草稿的日曆天數」判斷，跟工作天／日曆天的天數計算方式無關。
 REMIND_REPEAT_DAYS = 7
+MANAGER_SUMMARY_REMIND_REPEAT_DAYS = 2
 
 
 # ---------------------------------------------------------------------------
@@ -960,34 +962,60 @@ def build_notify_html(owner_name, deals):
   </ul>
   <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
   <p>謝謝！</p>
-<hr style="border:none;border-top:1px solid #dfd0ba;margin:16px 0;">
-  <p style="font-size:12px;color:#667085;">
-    小提醒，名單判斷規則：<br>
-    ・公司名單：進來後 3 天內要完成聯繫並調整階段<br>
-    ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核<br>
-    ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段
-  </p>
 </div>'''
 
 
 def build_manager_summary_html(deals):
-    """公司名單可轉派彙整信：跨業務、跨課別，寄給主管評估是否轉派。"""
-    items_html = []
+    """公司名單可轉派彙整信：跨業務、跨課別，寄給主管評估是否轉派。
+    依課別（TEAM_ORDER 的順序）分組，同課別裡再依業務姓名排序，
+    同一人底下的交易再依天數（多到少）排序，用表格呈現。"""
+    groups = defaultdict(list)
     for d in deals:
-        days_txt = "天數未知" if d["工作天數"] is None else f'已 {d["工作天數"]} {d["天數單位"]}'
-        crm_url = f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}"
-        items_html.append(
-            '<li style="margin-bottom:8px;">'
-            f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a>'
-            f'　<b>（{esc(d["業務課"])} {esc(d["業務"])}，{esc(days_txt)}）</b>'
-            '</li>'
+        groups[(d["業務課"], d["業務"] or "")].append(d)
+
+    def team_sort_key(team):
+        return TEAM_ORDER.index(team) if team in TEAM_ORDER else len(TEAM_ORDER)
+
+    sections_html = []
+    # 先依課別（照 TEAM_ORDER 的順序：業務一~四課、POS、Ambrose），同課別裡再依業務姓名排序。
+    for (team, owner), owner_deals in sorted(groups.items(), key=lambda kv: (team_sort_key(kv[0][0]), kv[0][1])):
+        owner_deals = sorted(
+            owner_deals,
+            key=lambda d: -(d["工作天數"] if d["工作天數"] is not None else -1),
         )
+        rows_html = []
+        for d in owner_deals:
+            days_txt = "天數未知" if d["工作天數"] is None else f'{d["工作天數"]} {d["天數單位"]}'
+            crm_url = f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}"
+            rows_html.append(
+                "<tr>"
+                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">'
+                f'<a href="{esc(crm_url)}" style="color:#173d33;">{esc(d["交易名稱"] or "")}</a></td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(d["Stage"])}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(days_txt)}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #eee;">{esc(STATUS_LABEL[d["狀態"]])}</td>'
+                "</tr>"
+            )
+        sections_html.append(f'''
+  <p style="margin-bottom:6px;"><b>{esc(team)} {esc(owner) or "（無業務資料）"}</b>（{len(owner_deals)} 筆）</p>
+  <table style="border-collapse:collapse;width:100%;margin-bottom:18px;font-size:13px;">
+    <thead>
+      <tr style="background:#f7f2e8;">
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
+      </tr>
+    </thead>
+    <tbody>
+      {"".join(rows_html)}
+    </tbody>
+  </table>''')
+
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
   <p>Ambrose 你好，</p>
-  <p>以下 {len(deals)} 筆「公司名單」交易已經超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天沒有更新，麻煩幫忙評估是否需要轉派給其他業務：</p>
-  <ul style="padding-left:20px;">
-    {"".join(items_html)}
-  </ul>
+  <p>以下 {len(deals)} 筆「公司名單」交易已經超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天沒有更新，麻煩幫忙評估是否需要轉派給其他業務（依課別、業務姓名排序）：</p>
+  {"".join(sections_html)}
   <p>如果已經處理過（例如已判斷有效/無效、或已經聯繫客戶），也麻煩請對應業務補填最新狀態，避免重複出現在這份清單。</p>
   <p>謝謝！</p>
 </div>'''
@@ -1014,13 +1042,15 @@ def create_gmail_draft(token, msg):
     return resp.json()
 
 
-def should_send_reminder(entry, current_status, now):
+def should_send_reminder(entry, current_status, now, repeat_days=REMIND_REPEAT_DAYS):
     """
     判斷這筆交易現在要不要（再）建立一封提醒草稿。
     - 之前從沒建過草稿：要建。
     - 狀態變了（例如本月有機會從月中檢核變月底檢核）：一定要重新建一次，不管天數。
-    - 狀態沒變，但距離上次建立草稿已經超過 REMIND_REPEAT_DAYS 天，業務還是沒處理：重複提醒一次。
+    - 狀態沒變，但距離上次建立草稿已經超過 repeat_days 天，業務還是沒處理：重複提醒一次。
     - 狀態沒變、也還沒到重複提醒的天數：不用再建，避免同一件事每天疲勞轟炸。
+    repeat_days 預設是業務個人提醒信用的 REMIND_REPEAT_DAYS（7天）；
+    主管彙整信另外傳 MANAGER_SUMMARY_REMIND_REPEAT_DAYS（2天），間隔比較短。
     """
     if not entry:
         return True
@@ -1036,7 +1066,7 @@ def should_send_reminder(entry, current_status, now):
     if last_dt.tzinfo is None:
         last_dt = last_dt.replace(tzinfo=TAIPEI_TZ)
     days_since = (now - last_dt).total_seconds() / 86400
-    return days_since >= REMIND_REPEAT_DAYS
+    return days_since >= repeat_days
 
 
 def run_auto_notify(records):
@@ -1100,7 +1130,7 @@ def run_manager_summary(records):
         if r["狀態"] != "escalate":
             continue
         entry = manager_log.get(r["id"])
-        if not should_send_reminder(entry, r["狀態"], now):
+        if not should_send_reminder(entry, r["狀態"], now, repeat_days=MANAGER_SUMMARY_REMIND_REPEAT_DAYS):
             continue
         pending.append(r)
 
