@@ -39,6 +39,12 @@ ACCOUNTS_DOMAIN = os.environ.get("ZOHO_ACCOUNTS_DOMAIN", "https://accounts.zoho.
 API_DOMAIN = os.environ.get("ZOHO_API_DOMAIN", "https://www.zohoapis.com")
 API_VERSION = "v8"
 
+# 網頁版 Zoho CRM 的交易連結（跟上面的 API_DOMAIN 是不同東西：API_DOMAIN 是給程式呼叫用的，
+# 這個是給人點的瀏覽器網址）。org 代碼來自 Zoho「Organization」API 的 domain_name 欄位，
+# Cyberbiz 這個組織固定是 org695870979，除非之後換了 Zoho 帳號否則不用改。
+ZOHO_CRM_WEB_DOMAIN = os.environ.get("ZOHO_CRM_WEB_DOMAIN", "https://crm.zoho.com")
+ZOHO_CRM_ORG_ID = os.environ.get("ZOHO_CRM_ORG_ID", "org695870979")
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_PATH = os.path.join(REPO_ROOT, "data", "stage_cache.json")
 OUTPUT_HTML_PATH = os.path.join(REPO_ROOT, "docs", "index.html")
@@ -398,12 +404,15 @@ NOTIFY_SCRIPT = '''<script>
   }
 
   function buildMailto(ownerEmail, ownerName, deals) {
-    var subject = "【階段提醒】" + ownerName + " 你有 " + deals.length + " 筆交易需要更新進度";
+    var subject = "【ZOHO交易階段提醒】" + ownerName + " 你有 " + deals.length + " 筆交易需要更新進度";
     var lines = [ownerName + " 你好，", "",
       "以下 " + deals.length + " 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：", ""];
     deals.forEach(function (d) {
       var daysTxt = (d.days === null || d.days === undefined) ? "天數未知" : ("已 " + d.days + " 個工作天");
       lines.push("・" + d.name + "（" + d.stage + "，" + daysTxt + "，" + d.status + "）");
+      if (d.crmUrl) {
+        lines.push("   點我開啟這筆交易：" + d.crmUrl);
+      }
     });
     lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
@@ -551,6 +560,7 @@ def render_html(records, generated_at):
                     "stage": stage_tag,
                     "days": d["工作天數"],
                     "status": STATUS_LABEL[d["狀態"]],
+                    "crmUrl": f"{ZOHO_CRM_WEB_DOMAIN}/crm/{ZOHO_CRM_ORG_ID}/tab/Deals/{d['id']}",
                 }, ensure_ascii=False)
                 cards.append(f'''
         <div class="deal-card {urgency_cls}" data-deal-id="{esc(d["id"])}" data-deal='{esc(notify_payload)}'>
