@@ -1004,7 +1004,7 @@ def build_notify_html(owner_name, deals):
   <p>{esc(owner_name)} 你好，</p>
   <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
   {_build_deals_table_html(deals)}
-  <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
+  <p>如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
   <p>謝謝！</p>
   {_RULE_REMINDER_HTML}
 </div>'''
