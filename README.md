@@ -45,7 +45,7 @@ Settings → Pages，Source 選 “Deploy from a branch”，Branch 選你的主
 業務課名單異動：改 scripts/generate_report.py 裡的 ROSTER 字典即可，不用改別的地方。
 月中/月底、2/3工作天門檻：改 generate_report.py 最上面幾個常數（COMPANY_LIST_REMIND_DAY 等）。
 國定假日：目前工作天計算只排除週六、週日（v1），沒有排除國定假日跟補班日。之後要補的話，在 workdays_between() 這個函式裡加一份台灣國定假日清單即可。
-寄信通知業務：已經做了兩種，可以並存使用：（1）網頁上手動勾選＋按鈕，開 Gmail 分頁讓你自己按送出（見下方「勾選寄信提醒功能」）；（2）每天自動幫「可轉派／月底檢核」這兩個最緊急狀態的交易建立 Gmail 草稿（見下方「自動寄信提醒（Gmail 草稿）」）。
+寄信通知業務：已經做了兩種，可以並存使用：（1）網頁上手動勾選＋按鈕，開 Gmail 分頁讓你自己按送出（見下方「勾選寄信提醒功能」）；（2）每天自動幫「可轉派／月底檢核／短期追蹤逾期」這三個最緊急狀態的交易直接寄出提醒信給業務本人，不用你確認（見下方「自動寄信提醒」）。
 公司名單第 3 個工作天（escalate 狀態）明確規則：只留備註／通知，不自動轉派。之後無論選哪種寄信方式，第 3 天觸發的動作都是「加一則備註 + 通知業務本人／主管」，程式不會、也不應該自動修改交易的 Owner 欄位。目前這版本本來就是唯讀（只讀 Zoho 資料，不寫回任何東西），之後加通知功能時務必維持這條線，避免不小心做成自動轉派。
 網頁版面：篩選＋排序表格
 網頁不是攤開的巢狀清單，是一張表格：
@@ -64,10 +64,12 @@ Settings → Pages，Source 選 “Deploy from a branch”，Branch 選你的主
 
 信件範本文字寫在 scripts/generate_report.py 的 REPORT_SCRIPT（buildGmailUrl 那段），要調整語氣或內容直接改那裡的字串即可。
 
-自動寄信提醒（Gmail 草稿）
-這是選填功能：每天 Actions 跑完報表後，會自動幫「可轉派」「月底檢核」「短期追蹤逾期」這三個最緊急狀態的交易，依業務分組各建一封 HTML 格式的提醒信草稿，放進你自己 Gmail 帳號的草稿匣（不是業務本人的信箱，因為我們只授權了你自己的帳號）。你每天早上打開 Gmail 草稿匣，逐一看過沒問題後手動按送出即可。同一筆交易只要狀態沒變，7 天內不會重複建立草稿；但如果業務放著超過 7 天都沒處理，會再重複提醒一次，直到狀態改變（例如業務更新了階段）為止，避免石沉大海。重複提醒的間隔可以改 scripts/generate_report.py 裡的 REMIND_REPEAT_DAYS 常數；要調整觸發範圍，改 URGENT_STATUSES 常數即可。
+自動寄信提醒
+這是選填功能：每天 Actions 跑完報表後，會自動幫「可轉派」「月底檢核」「短期追蹤逾期」這三個最緊急狀態的交易，依業務分組各直接寄出一封 HTML 格式的提醒信給業務本人（收件人是各業務自己的信箱），不用你手動確認、不會先進草稿匣。同一筆交易只要狀態沒變，7 天內不會重複寄；但如果業務放著超過 7 天都沒處理，會再重複提醒一次，直到狀態改變（例如業務更新了階段）為止，避免石沉大海。重複提醒的間隔可以改 scripts/generate_report.py 裡的 REMIND_REPEAT_DAYS 常數；要調整觸發範圍，改 URGENT_STATUSES 常數即可。
 
-另外還有一份主管彙整信：所有「公司名單」超過 3 個工作天（escalate 狀態）的交易，不管是誰名下的，會另外彙整成一封信寄給 MANAGER_SUMMARY_EMAIL（預設是 Ambrose Tsai，ambrose.tsai@cyberbiz.io），讓主管評估這幾筆是不是要轉派給別的業務。這封信跟業務個人的提醒信是分開追蹤、分開建立的，不會互相影響；一樣是狀態不變的話 7 天內不重複彙整，超過 7 天還沒處理會再彙整一次。要換收件人，改 GitHub Secret MANAGER_SUMMARY_EMAIL（或直接改程式碼裡的預設值）即可，不用重新走 OAuth 流程。
+如果想改回「先建草稿、你自己看過再送」，把 run_auto_notify() 裡呼叫的 send_gmail_message(token, msg) 換回 create_gmail_draft(token, msg) 即可，不需要重新走 OAuth（gmail.compose 這個授權範圍本來就同時涵蓋建草稿跟直接寄送兩種 API）。
+
+另外還有一份主管彙整信：公司名單交易超過 4 個工作天（比業務個人提醒晚一天，先給業務一天反應時間）沒更新的，不管是誰名下的，會彙整成一封信建成草稿寄給 MANAGER_SUMMARY_EMAIL（預設是 Ambrose Tsai，ambrose.tsai@cyberbiz.io），這封主管彙整信刻意維持草稿形式，Ambrose 自己看過確認要不要轉派、有沒有需要調整內容後再手動送出。這封信跟業務個人的提醒信是分開追蹤、分開建立的，不會互相影響；一樣是狀態不變的話 2 天內不重複彙整，超過 2 天還沒處理會再彙整一次（間隔可改 MANAGER_SUMMARY_REMIND_REPEAT_DAYS 常數）。要換收件人，改 GitHub Secret MANAGER_SUMMARY_EMAIL（或直接改程式碼裡的預設值）即可，不用重新走 OAuth 流程。
 
 沒設定下面這三組 Secret 的話，這個功能會自動跳過，完全不影響報表本身正常產生，你可以先不做這一段，之後想要了再回來設定。
 
@@ -99,22 +101,22 @@ GMAIL_CLIENT_ID	步驟 3 拿到的 Client ID
 GMAIL_CLIENT_SECRET	步驟 3 拿到的 Client Secret
 GMAIL_REFRESH_TOKEN	步驟 4 拿到的 Refresh Token
 MANAGER_SUMMARY_EMAIL（選填）	主管彙整信要寄給誰，預設 ambrose.tsai@cyberbiz.io，不設定就用預設值
-存完之後到 Actions 頁籤手動 Run workflow 跑一次，跑完打開 Gmail 草稿匣確認有沒有新草稿出現。如果沒有出現，去 Actions 那次執行的 log 裡看有沒有印出「換 Gmail access token 失敗」或「建立提醒草稿失敗」之類的錯誤訊息，通常代表某一組值貼錯或 Redirect URI 沒加對。
+存完之後到 Actions 頁籤手動 Run workflow 跑一次。業務個人提醒信是直接寄出的，跑完可以到你自己（授權帳號）的「寄件備份」確認有沒有寄出去；主管彙整信還是建草稿，跑完打開 Gmail 草稿匣確認有沒有新草稿出現。如果都沒出現，去 Actions 那次執行的 log 裡看有沒有印出「換 Gmail access token 失敗」「寄給 XXX 的提醒信失敗」或「建立主管彙整草稿失敗」之類的錯誤訊息，通常代表某一組值貼錯或 Redirect URI 沒加對。
 
 公司網域帳號有些設定是被 IT／Google Workspace 管理員鎖住的（例如禁止建立 Google Cloud 專案，或禁止安裝「未經驗證的協力廠商應用程式」）。如果卡在這幾步，去 Google Workspace 系統管理控制台的「安全性 → API 控管」確認一下這個應用程式有沒有被擋，或直接請 IT 協助開權限。
 
-之後想改成「不用手動按送出，系統自己直接寄」
-現在是保守做法：先建草稿，你看過確認沒問題再自己送，跑穩一陣子沒問題之後可以再升級成全自動寄出。到時候只要兩個小改動：
+業務個人提醒信目前已經是「直接寄出」
+業務個人提醒信已經改成全自動直接寄出，不用你手動按送出。這邊有個容易誤會的地方特別記錄一下：原本以為要重新走 OAuth 換一個 gmail.send 範圍的新 Refresh Token 才能改成直接寄送，但查證 Google 官方文件後發現 gmail.compose 這個範圍本來就同時涵蓋「建草稿」跟「直接寄送」兩種 API（users.messages.send），所以完全沿用原本設定 Gmail API 時拿到的同一組 GMAIL_REFRESH_TOKEN，不需要重新授權。程式碼上只是把 run_auto_notify() 裡呼叫的函式從 create_gmail_draft() 換成 send_gmail_message()，呼叫的網址從 .../drafts 改成 .../messages/send。
 
-回到步驟 4 的 OAuth Playground，把 scope 從 gmail.compose 換成 gmail.send，重新走一次流程拿新的 Refresh Token，更新 GitHub Secret 裡的 GMAIL_REFRESH_TOKEN。
-scripts/generate_report.py 裡 create_gmail_draft() 呼叫的網址從 .../drafts 改成 .../messages/send，body 一樣是 {"raw": ...}，不用再包一層 "message"。
-其餘（信件內容怎麼組、分組邏輯、避免重複寄送的紀錄檔 data/gmail_draft_log.json）都不用動，是同一套邏輯。
+如果想改回「先建草稿、自己看過再送」，把 run_auto_notify() 裡的 send_gmail_message(token, msg) 換回 create_gmail_draft(token, msg) 即可，一樣不用重新走 OAuth。
+
+主管彙整信刻意維持建草稿的形式（見上面「自動寄信提醒」段落），不受這次改動影響。
 
 已知限制
 工作天目前只排除週末，還沒排除國定假日/補班日。
-報表跟自動草稿都只處理 ROSTER 名單裡列出的人（業務一~四課、POS，加上 Ambrose、Ellie、Sabrina、William）。Owner 不在名單裡的交易會被整筆過濾掉，不會出現在網頁或草稿裡，不是資料遺漏。要新增/移除誰，改 scripts/generate_report.py 裡的 ROSTER 字典即可。
+報表跟自動寄信都只處理 ROSTER 名單裡列出的人（業務一~四課、POS，加上 Ambrose、Ellie、Sabrina、William）。Owner 不在名單裡的交易會被整筆過濾掉，不會出現在網頁或信件裡，不是資料遺漏。要新增/移除誰，改 scripts/generate_report.py 裡的 ROSTER 字典即可。
 這份報表看的是「即時的 Stage 現況」，不是歷史存檔；如果要留存每一天的歷史快照，可以另外把每天的 docs/index.html 或原始資料存到帶日期的檔名裡。
-自動 Gmail 草稿是建立在你自己授權的那個 Gmail 帳號的草稿匣裡，收件人（To）雖然填的是業務本人，但草稿本身不會出現在業務自己的信箱，需要你手動打開、確認、按送出，這才算真的寄出去。
+業務個人提醒信是直接寄出的，沒有人工審核這一步，寄出後無法收回；如果程式邏輯或資料有誤，錯誤的內容會直接送到業務信箱。主管彙整信則刻意保留在你自己授權帳號的草稿匣裡，需要你手動打開、確認、按送出才算真的寄出去。
 
 
 
@@ -129,11 +131,11 @@ CYBERBIZ 公司名單 / 本月有機會 自動追蹤網頁
 之後可以怎麼調整
 網頁版面：篩選＋排序表格
 勾選寄信提醒功能
-自動寄信提醒（Gmail 草稿）
+自動寄信提醒
 1. 到 Google Cloud Console 建立專案並啟用 Gmail API
 2. 設定 OAuth 同意畫面
 3. 建立 OAuth 用戶端（Client ID / Secret）
 4. 用 OAuth Playground 換 Refresh Token（不用寫任何程式）
 5. 把三組值存進 GitHub Secrets
-之後想改成「不用手動按送出，系統自己直接寄」
+業務個人提醒信目前已經是「直接寄出」
 已知限制
