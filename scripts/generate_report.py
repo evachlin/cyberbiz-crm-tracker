@@ -63,6 +63,12 @@ GMAIL_AUTO_NOTIFY_ENABLED = bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET and GMA
 # 業務個人提醒信、主管彙整信都只對「需優先處理」等級的狀態觸發（見下面 URGENT_STATUSES 常數），其餘狀態
 # 維持只顯示在網頁上，不自動發信提醒，避免信件太多、太早通知造成干擾。
 
+# 測試模式：業務個人提醒信是直接寄出、沒有草稿可以先看過，如果手動按 Run workflow 測試，
+# 很容易一不小心就把信真的寄給所有業務。設定這個值之後，所有業務個人提醒信的收件人都會
+# 被強制改成這個測試信箱（主旨會保留「原本應該寄給誰」的標註），方便你確認內容沒問題再關掉這個設定正式上線。
+# 主管彙整信本來就是建草稿、本來就安全，不受這個設定影響。
+NOTIFY_TEST_EMAIL = os.environ.get("NOTIFY_TEST_EMAIL") or ""
+
 # 主管彙整信（公司名單可轉派）：收件人固定寄給這位主管，他評估是否要轉派。
 # 用 "or" 不是 .get(key, default)：GitHub Actions 的 env: 區塊只要寫了
 # secrets.MANAGER_SUMMARY_EMAIL，即使沒設定那個 Secret 也會帶一個空字串進來，
@@ -1135,6 +1141,9 @@ def run_auto_notify(records):
         print(f"換 Gmail access token 失敗，本次略過自動寄信功能（{e.__class__.__name__}）：{e}")
         return
 
+    if NOTIFY_TEST_EMAIL:
+        print(f"⚠️ 測試模式開啟：所有業務個人提醒信都會改寄到 {NOTIFY_TEST_EMAIL}，不會真的寄給業務本人。")
+
     sent = 0
     now_iso = datetime.now(TAIPEI_TZ).isoformat()
     for (owner_email, owner_name), deals in by_owner.items():
@@ -1142,14 +1151,19 @@ def run_auto_notify(records):
             print(f"{owner_name} 沒有 email，略過自動寄信，請手動聯絡。")
             continue
         subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
+        if NOTIFY_TEST_EMAIL:
+            subject = f"[測試模式，原收件人：{owner_name} <{owner_email}>] {subject}"
         html_body = build_notify_html(owner_name, deals)
-        msg = build_mime_message(owner_email, subject, html_body)
+        to_email = NOTIFY_TEST_EMAIL or owner_email
+        msg = build_mime_message(to_email, subject, html_body)
         try:
             result = send_gmail_message(token, msg)
         except requests.exceptions.RequestException as e:
             print(f"寄給 {owner_name} 的提醒信失敗（{e.__class__.__name__}）：{e}")
             continue
         sent += 1
+        if NOTIFY_TEST_EMAIL:
+            continue  # 測試模式不寫入紀錄檔，避免正式排程誤以為這筆已經通知過而漏寄
         for d in deals:
             log[d["id"]] = {"status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id")}
 
