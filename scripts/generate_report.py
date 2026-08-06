@@ -53,12 +53,14 @@ API_VERSION = "v8"
 ZOHO_CRM_WEB_DOMAIN = os.environ.get("ZOHO_CRM_WEB_DOMAIN", "https://crm.zoho.com")
 ZOHO_CRM_ORG_ID = os.environ.get("ZOHO_CRM_ORG_ID", "org695870979")
 
-# Gmail API（自動建立提醒草稿用，選填）。三個都設定了才會啟用，任一沒填就自動跳過這個功能。
+# Gmail API（自動寄信提醒用，選填）。三個都設定了才會啟用，任一沒填就自動跳過這個功能。
+# 業務個人提醒信：直接寄出，不用人工確認（run_auto_notify / send_gmail_message）。
+# 主管彙整信：還是建草稿，Ambrose 要自己看過再手動送出（run_manager_summary / create_gmail_draft）。
 GMAIL_CLIENT_ID = os.environ.get("GMAIL_CLIENT_ID", "")
 GMAIL_CLIENT_SECRET = os.environ.get("GMAIL_CLIENT_SECRET", "")
 GMAIL_REFRESH_TOKEN = os.environ.get("GMAIL_REFRESH_TOKEN", "")
 GMAIL_AUTO_NOTIFY_ENABLED = bool(GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN)
-# 自動建草稿只對「需優先處理」等級的狀態觸發（見下面 URGENT_STATUSES 常數），其餘狀態
+# 業務個人提醒信、主管彙整信都只對「需優先處理」等級的狀態觸發（見下面 URGENT_STATUSES 常數），其餘狀態
 # 維持只顯示在網頁上，不自動發信提醒，避免信件太多、太早通知造成干擾。
 
 # 主管彙整信（公司名單可轉派）：收件人固定寄給這位主管，他評估是否要轉派。
@@ -90,7 +92,6 @@ ROSTER = {
     "chris.zhong@cyberbiz.io": ("Chris Zhong", "業務三課"),
     "shelly.wang@cyberbiz.io": ("Shelly Wang", "業務三課"),
     "ryan.fang@cyberbiz.io": ("Ryan Fang", "業務三課"),
-    "hans.yu@cyberbiz.io": ("Hans Yu", "業務三課"),
     "chester.liao@cyberbiz.io": ("Chester Liao", "業務四課"),
     "francis.cheng@cyberbiz.io": ("Francis Cheng", "業務四課"),
     "calvin.chen@cyberbiz.io": ("Calvin Chen", "業務四課"),
@@ -115,7 +116,11 @@ TRACK_SINCE = "2026-01-01T00:00:00+08:00"  # 只追蹤這個日期之後建立�
 
 # 規則門檻（工作天，只排除週六週日，尚未納入國定假日 —— 之後要補請看 README）
 COMPANY_LIST_REMIND_DAY = 2      # 第 2 個工作天：提醒判斷有效/無效
-COMPANY_LIST_ESCALATE_DAY = 3    # 第 3 個工作天：標記可轉派
+COMPANY_LIST_ESCALATE_DAY = 3    # 第 3 個工作天：標記可轉派，業務個人提醒信在這一天觸發
+# 主管彙整信比業務個人提醒晚一天觸發（第 4 個工作天），先給業務一天時間反應前一天的提醒，
+# 隔天還沒處理的才會出現在給 Ambrose 的彙整信裡評估轉派。獨立於 COMPANY_LIST_ESCALATE_DAY，
+# 不影響網頁報表上顯示的「可轉派」狀態（那個還是從第 3 個工作天就會顯示）。
+COMPANY_LIST_MANAGER_ESCALATE_DAY = 4
 OPPORTUNITY_MIDCHECK_DAY = 11    # 月中檢核
 OPPORTUNITY_ENDCHECK_DAY = 22    # 月底檢核
 # 短期追蹤：只有一個門檻，用「日曆天」算（不是工作天），超過就標記需優先處理
@@ -126,7 +131,7 @@ SHORT_TERM_ESCALATE_DAYS = 90
 # 業務個人提醒信（三個階段共用）跟寄給主管的公司名單彙整信，用不同的重複間隔：
 # 業務個人的怕太頻繁疲乏，7 天一次；主管彙整信跟主管討論過，希望更緊盯轉派決策，改成 2 天一次。
 # 都是用「距離上次建立草稿的日曆天數」判斷，跟工作天／日曆天的天數計算方式無關。
-REMIND_REPEAT_DAYS = 3
+REMIND_REPEAT_DAYS = 7
 MANAGER_SUMMARY_REMIND_REPEAT_DAYS = 2
 
 
@@ -529,7 +534,7 @@ REPORT_SCRIPT = '''<script>
       lines.push("・" + d.name + "（" + d.stage + "，" + daysText(d) + "，" + d.statusLabel + "）");
       lines.push("   點我開啟這筆交易：" + d.crmUrl);
     });
-    lines.push("", "如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
+    lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
     // Gmail 網頁版的寫信網址，不是 mailto:（mailto 需要瀏覽器/系統註冊處理常式，
     // 公司網域管理的 Chrome 設定檔常常鎖掉這個權限，導致完全沒反應）。
@@ -944,14 +949,14 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
 
 
 def _build_deals_table_html(deals):
-    """把一份交易清單組成統一格式的表格（交易名稱／階段／天數／規則），依天數多到少排序。"""
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
     w1, w2, w3, w4 = _TABLE_COL_WIDTHS
     deals_sorted = sorted(
         deals,
@@ -978,7 +983,7 @@ def _build_deals_table_html(deals):
       <tr style="background:#f7f2e8;">
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
       </tr>
     </thead>
@@ -992,19 +997,19 @@ _RULE_REMINDER_HTML = '''
   <hr style="border:none;border-top:1px solid #dfd0ba;margin:16px 0;">
   <p style="font-size:12px;color:#667085;">
     小提醒，名單判斷規則：<br>
-    ・公司名單：進來後 3 天內要完成聯繫並調整階段<br>
+    ・公司名單：進來後 7 天內要完成聯繫並調整階段<br>
     ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核<br>
     ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段
   </p>'''
 
 
 def build_notify_html(owner_name, deals):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。"""
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。"""
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
   <p>{esc(owner_name)} 你好，</p>
   <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
   {_build_deals_table_html(deals)}
-  <p>如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
+  <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
   <p>謝謝！</p>
   {_RULE_REMINDER_HTML}
 </div>'''
@@ -1030,7 +1035,7 @@ def build_manager_summary_html(deals):
 
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
   <p>Ambrose 你好，</p>
-  <p>以下 {len(deals)} 筆「公司名單」交易已經超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天沒有更新，麻煩幫忙評估是否需要轉派給其他業務（依課別、業務姓名排序）：</p>
+  <p>以下 {len(deals)} 筆「公司名單」交易已經超過 {COMPANY_LIST_MANAGER_ESCALATE_DAY} 個工作天沒有更新，麻煩幫忙評估是否需要轉派給其他業務（依課別、業務姓名排序）：</p>
   {"".join(sections_html)}
   <p>如果已經處理過（例如已判斷有效/無效、或已經聯繫客戶），也麻煩請對應業務補填最新狀態，避免重複出現在這份清單。</p>
   <p>謝謝！</p>
@@ -1047,11 +1052,28 @@ def build_mime_message(to_email, subject, html_body):
 
 
 def create_gmail_draft(token, msg):
+    """建立草稿（不會寄出），目前給主管彙整信用——Ambrose 那封還是要人工看過再手動送出。"""
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
     resp = requests.post(
         "https://gmail.googleapis.com/gmail/v1/users/me/drafts",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"message": {"raw": raw}},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def send_gmail_message(token, msg):
+    """直接寄出（不是建草稿），目前給業務個人提醒信用。
+    注意：現有的 GMAIL_REFRESH_TOKEN 是用 gmail.compose 範圍授權的，不需要重新走 OAuth——
+    Google 官方文件裡 gmail.compose 範圍本來就涵蓋 users.messages.send 這個 API，
+    只是原本我們只拿它來建草稿，現在改叫直接寄送的端點而已。"""
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")
+    resp = requests.post(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        json={"raw": raw},
         timeout=30,
     )
     resp.raise_for_status()
@@ -1086,8 +1108,10 @@ def should_send_reminder(entry, current_status, now, repeat_days=REMIND_REPEAT_D
 
 
 def run_auto_notify(records):
+    """業務個人提醒信：直接寄出，不再是建草稿、不需要人工按送出。
+    （寄給 Ambrose 的主管彙整信不受影響，還是走 create_gmail_draft 建草稿，維持人工看過再送。）"""
     if not GMAIL_AUTO_NOTIFY_ENABLED:
-        print("尚未設定 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN，略過自動建立提醒草稿功能。")
+        print("尚未設定 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN，略過自動寄信提醒功能。")
         return
 
     log = load_draft_log()
@@ -1098,43 +1122,45 @@ def run_auto_notify(records):
             continue
         entry = log.get(r["id"])
         if not should_send_reminder(entry, r["狀態"], now):
-            continue  # 狀態沒變，而且還沒到重複提醒的天數，不用再建
+            continue  # 狀態沒變，而且還沒到重複提醒的天數，不用再寄
         by_owner[(r["業務Email"], r["業務"])].append(r)
 
     if not by_owner:
-        print("沒有新的需優先處理交易需要建立提醒草稿。")
+        print("沒有新的需優先處理交易需要寄提醒信。")
         return
 
     try:
         token = get_gmail_access_token()
     except requests.exceptions.RequestException as e:
-        print(f"換 Gmail access token 失敗，本次略過自動草稿功能（{e.__class__.__name__}）：{e}")
+        print(f"換 Gmail access token 失敗，本次略過自動寄信功能（{e.__class__.__name__}）：{e}")
         return
 
-    created = 0
+    sent = 0
     now_iso = datetime.now(TAIPEI_TZ).isoformat()
     for (owner_email, owner_name), deals in by_owner.items():
         if not owner_email:
-            print(f"{owner_name} 沒有 email，略過自動草稿，請手動聯絡。")
+            print(f"{owner_name} 沒有 email，略過自動寄信，請手動聯絡。")
             continue
         subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
         html_body = build_notify_html(owner_name, deals)
         msg = build_mime_message(owner_email, subject, html_body)
         try:
-            result = create_gmail_draft(token, msg)
+            result = send_gmail_message(token, msg)
         except requests.exceptions.RequestException as e:
-            print(f"幫 {owner_name} 建立提醒草稿失敗（{e.__class__.__name__}）：{e}")
+            print(f"寄給 {owner_name} 的提醒信失敗（{e.__class__.__name__}）：{e}")
             continue
-        created += 1
+        sent += 1
         for d in deals:
             log[d["id"]] = {"status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id")}
 
     save_draft_log(log)
-    print(f"本次共建立 {created} 封提醒草稿，存在寄件者 Gmail 帳號的草稿匣，需要手動確認後送出。")
+    print(f"本次共直接寄出 {sent} 封提醒信，收件人是各自的業務本人，不需要再手動確認送出。")
 
 
 def run_manager_summary(records):
-    """公司名單超過門檻（escalate）的交易，額外彙整成一封信給主管評估轉派，跟業務個人通知分開追蹤。"""
+    """公司名單超過門檻的交易，額外彙整成一封信給主管評估轉派，跟業務個人通知分開追蹤。
+    門檻用 COMPANY_LIST_MANAGER_ESCALATE_DAY（第4個工作天），比業務個人提醒信晚一天，
+    先給業務一天時間反應前一天收到的提醒，隔天還沒處理才會進到這份給 Ambrose 的清單。"""
     if not GMAIL_AUTO_NOTIFY_ENABLED:
         return
 
@@ -1143,7 +1169,9 @@ def run_manager_summary(records):
     now = datetime.now(TAIPEI_TZ)
     pending = []
     for r in records:
-        if r["狀態"] != "escalate":
+        if r["Stage"] != "公司名單":
+            continue
+        if r["工作天數"] is None or r["工作天數"] < COMPANY_LIST_MANAGER_ESCALATE_DAY:
             continue
         entry = manager_log.get(r["id"])
         if not should_send_reminder(entry, r["狀態"], now, repeat_days=MANAGER_SUMMARY_REMIND_REPEAT_DAYS):
