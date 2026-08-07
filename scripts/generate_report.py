@@ -82,7 +82,14 @@ DRAFT_LOG_PATH = os.path.join(REPO_ROOT, "data", "gmail_draft_log.json")
 OUTPUT_HTML_PATH = os.path.join(REPO_ROOT, "docs", "index.html")
 # 記錄「公司名單」交易上一次看到的 Owner，用來偵測主管轉派：
 # 如果同一筆交易今天的 Owner 跟快取裡不一樣，代表被轉派給別人了，要通知新接手的業務。
-OWNER_CACHE_PATH = os.path.join(REPO_ROOT, "data", "owner_cache.json")
+REASSIGN_CACHE_PATH = os.path.join(REPO_ROOT, "data", "reassign_cache.json")
+# Zoho 裡真的有一個叫「重分配」的 Stage（不是我們自己虛擬出來的），主管把交易轉派給
+# 新業務時會把 Stage 改成這個值。我們只在意「最近才被改成這個 Stage」的交易，
+# 所以每天只抓 Modified_Time 在最近 REASSIGN_LOOKBACK_DAYS 天內的，不用把歷史上
+# 一堆早就停在這個階段、沒人管的舊交易也抓進來。天數故意抓 3 天（>2 天週末），
+# 確保週一早上還能抓到週五才被轉派的交易。
+REASSIGN_STAGE_NAME = "重分配"
+REASSIGN_LOOKBACK_DAYS = 3
 
 # ---------------------------------------------------------------------------
 # 業務課對照表：跟 Zoho 裡的 Owner email 對應。人員異動時只要改這裡。
@@ -101,6 +108,7 @@ ROSTER = {
     "chris.zhong@cyberbiz.io": ("Chris Zhong", "業務三課"),
     "shelly.wang@cyberbiz.io": ("Shelly Wang", "業務三課"),
     "ryan.fang@cyberbiz.io": ("Ryan Fang", "業務三課"),
+    "hans.yu@cyberbiz.io": ("Hans Yu", "業務三課"),
     "chester.liao@cyberbiz.io": ("Chester Liao", "業務四課"),
     "francis.cheng@cyberbiz.io": ("Francis Cheng", "業務四課"),
     "calvin.chen@cyberbiz.io": ("Calvin Chen", "業務四課"),
@@ -310,40 +318,71 @@ def save_cache(cache):
         json.dump(cache, f, ensure_ascii=False, indent=1)
 
 
-def load_owner_cache():
-    if os.path.exists(OWNER_CACHE_PATH):
-        with open(OWNER_CACHE_PATH, encoding="utf-8") as f:
+def load_reassign_cache():
+    if os.path.exists(REASSIGN_CACHE_PATH):
+        with open(REASSIGN_CACHE_PATH, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 
-def save_owner_cache(cache):
-    os.makedirs(os.path.dirname(OWNER_CACHE_PATH), exist_ok=True)
-    with open(OWNER_CACHE_PATH, "w", encoding="utf-8") as f:
+def save_reassign_cache(cache):
+    os.makedirs(os.path.dirname(REASSIGN_CACHE_PATH), exist_ok=True)
+    with open(REASSIGN_CACHE_PATH, "w", encoding="utf-8") as f:
         json.dump(cache, f, ensure_ascii=False, indent=1)
 
 
-def detect_reassignments(records, owner_cache):
+def fetch_reassigned_deals(token):
+    """抓最近 REASSIGN_LOOKBACK_DAYS 天內、Stage 剛被改成「重分配」的交易（只留 ROSTER 業務）。"""
+    since = (datetime.now(TAIPEI_TZ) - timedelta(days=REASSIGN_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%S+08:00")
+    query = (
+        "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, Modified_Time "
+        f"FROM Deals WHERE (Stage = '{REASSIGN_STAGE_NAME}') AND (Modified_Time >= '{since}') "
+        "ORDER BY Modified_Time DESC"
+    )
+    rows = coql_query(token, query)
+    if ROSTER_ONLY_FILTER:
+        rows = [r for r in rows if r.get("Owner.email") in ROSTER]
+    return rows
+
+
+def build_reassigned_records(rows):
+    """把重分配交易的原始欄位轉成跟 build_records() 一樣格式的 dict，方便共用報表/信件的排版函式。"""
+    now = datetime.now(TAIPEI_TZ)
+    records = []
+    for r in rows:
+        name, team = resolve_owner(r.get("Owner.email"), r.get("Owner.first_name"), r.get("Owner.last_name"))
+        modified_dt = parse_zoho_dt(r.get("Modified_Time"))
+        age = calendar_days_between(modified_dt, now) if modified_dt else None
+        records.append({
+            "id": r["id"],
+            "交易名稱": r.get("Deal_Name"),
+            "業務": name,
+            "業務Email": r.get("Owner.email") or "",
+            "業務課": team,
+            "Stage": REASSIGN_STAGE_NAME,
+            "工作天數": age,
+            "天數單位": "天",
+            "狀態": "reassigned",
+        })
+    return records
+
+
+def diff_new_reassignments(records, cache):
     """
-    比對「公司名單」交易這次抓到的 Owner，跟上次快取的 Owner 是否不同，
-    藉此偵測主管轉派。只認公司名單這個階段（配合目前主管彙整信的轉派流程），
-    也只在「上次有看過這筆交易、而且 Owner 真的不一樣」時才算轉派；
-    第一次看到的交易（快取裡沒有）不算轉派，只是先記錄基準值，避免第一次跑就整批誤判。
-    回傳：(reassigned 的 records 列表，更新後的 owner_cache)
+    跟快取比對，回傳「這次要通知業務」的新轉派清單（快取裡沒看過的 id），以及更新後的快取。
+    快取只用來擋重複通知——同一筆交易在 REASSIGN_LOOKBACK_DAYS 的查詢窗口內重複被抓到時，
+    只有第一次會通知，之後即使它還停在「重分配」也不會每天再寄一次。
+    快取會順便清掉太舊的紀錄（超過查詢窗口兩倍時間沒再出現），避免檔案無限長大。
     """
-    new_cache = dict(owner_cache)
-    reassigned = []
+    now_ts = datetime.now(TAIPEI_TZ).timestamp()
+    prune_before = now_ts - REASSIGN_LOOKBACK_DAYS * 2 * 86400
+    new_cache = {k: v for k, v in cache.items() if v.get("seen_at", 0) >= prune_before}
+    newly_notified = []
     for r in records:
-        if r["Stage"] != "公司名單":
-            continue
-        rid = r["id"]
-        new_owner = r["業務Email"]
-        old_owner = owner_cache.get(rid)
-        if old_owner and new_owner and old_owner != new_owner:
-            reassigned.append(r)
-        if new_owner:
-            new_cache[rid] = new_owner
-    return reassigned, new_cache
+        if r["id"] not in cache:
+            newly_notified.append(r)
+        new_cache[r["id"]] = {"seen_at": now_ts}
+    return newly_notified, new_cache
 
 
 def resolve_owner(email, first_name, last_name):
@@ -467,10 +506,11 @@ def build_records(token, rows, cache):
 # ---------------------------------------------------------------------------
 # HTML 產出
 # ---------------------------------------------------------------------------
-# "reassigned" 是報表顯示專用的虛擬狀態（見 main() 裡組 report_records 那段），
-# 不是 build_records() 真的會算出來的狀態、也不放進 URGENT_STATUSES——
-# 轉派通知有自己獨立的偵測機制（detect_reassignments），不需要、也不應該重複被
-# run_auto_notify 原本那條「逾期提醒」邏輯再抓一次，避免同一筆交易在同一封信裡出現兩次。
+# "reassigned" 對應 Zoho 裡真實的「重分配」Stage（見 fetch_reassigned_deals()），
+# 不是 build_records() 算出來的狀態、也不放進 URGENT_STATUSES——
+# 轉派通知有自己獨立的偵測機制（fetch_reassigned_deals + diff_new_reassignments），
+# 不需要、也不應該重複被 run_auto_notify 原本那條「逾期提醒」邏輯再抓一次，
+# 避免同一筆交易在同一封信裡出現兩次。
 STATUS_LABEL = {
     "new": "新名單",
     "remind": f"提醒判斷（≥{COMPANY_LIST_REMIND_DAY}工作天）",
@@ -480,7 +520,7 @@ STATUS_LABEL = {
     "endcheck": f"月底檢核（≥{OPPORTUNITY_ENDCHECK_DAY}工作天）",
     "st_tracking": "短期追蹤中",
     "st_escalate": f"短期追蹤逾期（≥{SHORT_TERM_ESCALATE_DAYS}天）",
-    "reassigned": "主管剛轉派，待聯繫客戶",
+    "reassigned": "重分配，待聯繫客戶",
     "unknown": "天數未知",
 }
 STATUS_CLASS = {
@@ -499,8 +539,8 @@ STATUS_PRIORITY = {
 }
 # 需要優先處理／會觸發自動 Gmail 草稿的狀態，集中在這裡管理，避免各處各寫一份漏掉新狀態。
 URGENT_STATUSES = ("escalate", "endcheck", "st_escalate")
-# 報表上獨立的「重分配」虛擬階段名稱，不是 Zoho 裡真的 Stage 值，只在報表顯示用。
-REASSIGNED_STAGE_LABEL = "重分配"
+# 報表統計數字用的階段名稱，直接對應 Zoho 裡真實的「重分配」Stage（見 REASSIGN_STAGE_NAME）。
+REASSIGNED_STAGE_LABEL = REASSIGN_STAGE_NAME
 
 
 # ---------------------------------------------------------------------------
@@ -903,7 +943,7 @@ def render_html(records, generated_at):
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
   <h1>公司名單 / 本月有機會 / 短期追蹤 階段追蹤</h1>
-  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期｜重分配：主管剛轉派給新業務、待聯繫的公司名單交易（獨立分類，不算進公司名單數字裡）</div>
+  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期｜重分配：Zoho 裡 Stage 已被主管改成「重分配」、最近 {REASSIGN_LOOKBACK_DAYS} 天內待新業務聯繫的交易（獨立分類，不算進其他階段數字裡）</div>
   <div class="stat-line">共 {len(records)} 筆需優先處理（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆、重分配 {stage_counter.get(REASSIGNED_STAGE_LABEL,0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
 </div>
 <div class="sticky-panel">
@@ -1059,8 +1099,8 @@ _RULE_REMINDER_HTML = '''
 
 def build_notify_html(owner_name, deals, reassigned_deals=None):
     """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。
-    reassigned_deals（選填）：主管剛轉派給這位業務的公司名單交易，會另外用一個獨立表格呈現，
-    跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人今天
+    reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
+    跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人這次
     只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
     reassigned_deals = reassigned_deals or []
 
@@ -1074,7 +1114,7 @@ def build_notify_html(owner_name, deals, reassigned_deals=None):
     reassigned_section = ""
     if reassigned_deals:
         reassigned_section = f'''
-  <p><b>另外，你昨天收到 {len(reassigned_deals)} 筆主管轉派的公司名單交易，麻煩盡快聯繫客戶：</b></p>
+  <p><b>另外，你最近收到 {len(reassigned_deals)} 筆主管轉派的交易，麻煩盡快聯繫客戶：</b></p>
   {_build_deals_table_html(reassigned_deals)}'''
 
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
@@ -1187,8 +1227,8 @@ def run_auto_notify(records, reassigned):
 
     一封信最多包含兩段、各自獨立的表格：
     1. 逾期提醒（可轉派／月底檢核／短期追蹤逾期，跟以前一樣）。
-    2. 主管轉派通知：如果這個人今天有新被指派公司名單交易（reassigned 參數，
-       由 main() 統一呼叫 detect_reassignments() 算好、也同時用在網頁報表上，
+    2. 主管轉派通知：如果這個人最近有新被轉派的交易（reassigned 參數，由 main() 統一呼叫
+       fetch_reassigned_deals() + diff_new_reassignments() 算好、也同時用在網頁報表上，
        確保兩邊看到的轉派名單是同一份，不會兜不起來），不管他有沒有逾期提醒都會收到這段，
        兩段表格分開呈現，不會混在同一個表格裡。
     """
@@ -1240,7 +1280,7 @@ def run_auto_notify(records, reassigned):
         elif deals:
             subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
         else:
-            subject = f"【ZOHO交易階段提醒】{owner_name} 你收到 {len(reassigned_deals)} 筆主管轉派的公司名單交易"
+            subject = f"【ZOHO交易階段提醒】{owner_name} 你收到 {len(reassigned_deals)} 筆主管轉派的交易"
 
         if NOTIFY_TEST_EMAIL:
             subject = f"[測試模式，原收件人：{owner_name} <{owner_email}>] {subject}"
@@ -1318,25 +1358,20 @@ def main():
     save_cache(new_cache)
 
     # 主管轉派偵測：只算一次，網頁報表跟自動寄信共用同一份結果，確保兩邊看到的轉派名單一致。
-    owner_cache = load_owner_cache()
-    reassigned, new_owner_cache = detect_reassignments(records, owner_cache)
-    save_owner_cache(new_owner_cache)
-    reassigned_ids = {r["id"] for r in reassigned}
+    # 直接查 Zoho 裡真實的「重分配」Stage（見 fetch_reassigned_deals），不再用 Owner 欄位
+    # 每日比對去猜——實測發現公司名單階段裡從來沒有真的抓到過 Owner 變化，
+    # 因為主管轉派時是直接把 Stage 改成「重分配」，不是單純換 Owner。
+    reassign_cache = load_reassign_cache()
+    reassign_rows = fetch_reassigned_deals(token)
+    reassigned_all = build_reassigned_records(reassign_rows)  # 報表用：最近幾天內的重分配交易，全部列出
+    reassigned, new_reassign_cache = diff_new_reassignments(reassigned_all, reassign_cache)  # 寄信用：只有「這次才第一次看到」的才通知
+    save_reassign_cache(new_reassign_cache)
 
     # 快取／自動草稿仍然要看「全部」記錄（追蹤中但天數還沒到門檻的也要一起處理，
     # 這樣快取才不會漏、之後一旦超過門檻才能馬上被抓到），但網頁報表本身只列出
     # 已經滿足三個門檻條件（可轉派／月底檢核／短期追蹤逾期）的交易，正常天數的不顯示。
-    # 剛被轉派的交易另外獨立算一個「重分配」類別，不歸在公司名單底下——
-    # 對新接手的業務來說這是全新的交易，不該顯示成他已經逾期很久。
-    report_records = []
-    for r in records:
-        if r["id"] in reassigned_ids:
-            rr = dict(r)
-            rr["Stage"] = REASSIGNED_STAGE_LABEL
-            rr["狀態"] = "reassigned"
-            report_records.append(rr)
-        elif r["狀態"] in URGENT_STATUSES:
-            report_records.append(r)
+    # 重分配交易另外獨立算一個類別，不歸在原本的階段底下。
+    report_records = [r for r in records if r["狀態"] in URGENT_STATUSES] + reassigned_all
 
     generated_at = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M (UTC+8)")
     html_out = render_html(report_records, generated_at)
