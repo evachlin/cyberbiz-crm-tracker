@@ -629,12 +629,12 @@ REPORT_SCRIPT = '''<script>
   function buildGmailUrl(ownerEmail, ownerName, deals) {
     var subject = "【ZOHO交易階段提醒】" + ownerName + " 你有 " + deals.length + " 筆交易需要更新進度";
     var lines = [ownerName + " 你好，", "",
-      "以下 " + deals.length + " 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：", ""];
+      "以下 " + deals.length + " 筆名單目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：", ""];
     deals.forEach(function (d) {
       lines.push("・" + d.name + "（" + d.stage + "，" + daysText(d) + "，" + d.statusLabel + "）");
       lines.push("   點我開啟這筆交易：" + d.crmUrl);
     });
-    lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
+    lines.push("", "如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態及調整階段，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
     // Gmail 網頁版的寫信網址，不是 mailto:（mailto 需要瀏覽器/系統註冊處理常式，
     // 公司網域管理的 Chrome 設定檔常常鎖掉這個權限，導致完全沒反應）。
@@ -1050,14 +1050,14 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
 
 
 def _build_deals_table_html(deals):
-    """把一份交易清單組成統一格式的表格（交易名稱／階段／天數／規則），依天數多到少排序。"""
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
     w1, w2, w3, w4 = _TABLE_COL_WIDTHS
     deals_sorted = sorted(
         deals,
@@ -1084,7 +1084,7 @@ def _build_deals_table_html(deals):
       <tr style="background:#f7f2e8;">
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
       </tr>
     </thead>
@@ -1098,14 +1098,14 @@ _RULE_REMINDER_HTML = '''
   <hr style="border:none;border-top:1px solid #dfd0ba;margin:16px 0;">
   <p style="font-size:12px;color:#667085;">
     小提醒，名單判斷規則：<br>
-    ・公司名單：進來後 7 天內要完成聯繫並調整階段<br>
-    ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核<br>
+    ・公司名單：進來後 3 天內要完成聯繫並調整階段<br>
+    ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核並調整階段<br>
     ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段
   </p>'''
 
 
 def build_notify_html(owner_name, deals, reassigned_deals=None):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。
     reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
     跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人這次
     只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
@@ -1114,14 +1114,14 @@ def build_notify_html(owner_name, deals, reassigned_deals=None):
     overdue_section = ""
     if deals:
         overdue_section = f'''
-  <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
+  <p>以下 {len(deals)} 筆名單目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
   {_build_deals_table_html(deals)}
-  <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>'''
+  <p>如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態及調整階段，避免被誤判成沒進度。</p>'''
 
     reassigned_section = ""
     if reassigned_deals:
         reassigned_section = f'''
-  <p><b>另外，你最近收到 {len(reassigned_deals)} 筆主管轉派的交易，麻煩盡快聯繫客戶：</b></p>
+  <p><b>另外，你在昨天(或禮拜五)收到 {len(reassigned_deals)} 筆重分配的名單，再麻煩盡快聯繫客戶：</b></p>
   {_build_deals_table_html(reassigned_deals)}'''
 
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
@@ -1160,9 +1160,11 @@ def build_manager_summary_html(deals):
 </div>'''
 
 
-def build_mime_message(to_email, subject, html_body):
+def build_mime_message(to_email, subject, html_body, cc_email=None):
     msg = EmailMessage()
     msg["To"] = to_email
+    if cc_email:
+        msg["Cc"] = cc_email
     msg["Subject"] = subject
     msg.set_content("這封信包含 HTML 格式，請用支援 HTML 的信箱檢視。")
     msg.add_alternative(html_body, subtype="html")
@@ -1271,7 +1273,7 @@ def run_auto_notify(records, reassigned):
         return
 
     if NOTIFY_TEST_EMAIL:
-        print(f"⚠️ 測試模式開啟：所有業務個人提醒信都會改寄到 {NOTIFY_TEST_EMAIL}，不會真的寄給業務本人。")
+        print(f"⚠️ 測試模式開啟：所有業務個人提醒信都會改寄到 {NOTIFY_TEST_EMAIL}，不會真的寄給業務本人，也不會 CC Ambrose。")
 
     sent = 0
     now_iso = datetime.now(TAIPEI_TZ).isoformat()
@@ -1293,7 +1295,9 @@ def run_auto_notify(records, reassigned):
             subject = f"[測試模式，原收件人：{owner_name} <{owner_email}>] {subject}"
         html_body = build_notify_html(owner_name, deals, reassigned_deals)
         to_email = NOTIFY_TEST_EMAIL or owner_email
-        msg = build_mime_message(to_email, subject, html_body)
+        # 每封業務個人提醒信都 CC 給 Ambrose，讓他同步掌握進度；測試模式不 CC，避免手動測試時真的通知到他。
+        cc_email = None if NOTIFY_TEST_EMAIL else MANAGER_SUMMARY_EMAIL
+        msg = build_mime_message(to_email, subject, html_body, cc_email=cc_email)
         try:
             result = create_gmail_draft(token, msg)  # 測試階段先建草稿，確認沒問題後改回 send_gmail_message
         except requests.exceptions.RequestException as e:
