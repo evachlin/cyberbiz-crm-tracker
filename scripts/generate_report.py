@@ -467,6 +467,10 @@ def build_records(token, rows, cache):
 # ---------------------------------------------------------------------------
 # HTML 產出
 # ---------------------------------------------------------------------------
+# "reassigned" 是報表顯示專用的虛擬狀態（見 main() 裡組 report_records 那段），
+# 不是 build_records() 真的會算出來的狀態、也不放進 URGENT_STATUSES——
+# 轉派通知有自己獨立的偵測機制（detect_reassignments），不需要、也不應該重複被
+# run_auto_notify 原本那條「逾期提醒」邏輯再抓一次，避免同一筆交易在同一封信裡出現兩次。
 STATUS_LABEL = {
     "new": "新名單",
     "remind": f"提醒判斷（≥{COMPANY_LIST_REMIND_DAY}工作天）",
@@ -476,23 +480,27 @@ STATUS_LABEL = {
     "endcheck": f"月底檢核（≥{OPPORTUNITY_ENDCHECK_DAY}工作天）",
     "st_tracking": "短期追蹤中",
     "st_escalate": f"短期追蹤逾期（≥{SHORT_TERM_ESCALATE_DAYS}天）",
+    "reassigned": "主管剛轉派，待聯繫客戶",
     "unknown": "天數未知",
 }
 STATUS_CLASS = {
     "new": "st-new", "remind": "st-warn", "escalate": "st-danger",
     "tracking": "st-new", "midcheck": "st-warn", "endcheck": "st-danger",
     "st_tracking": "st-new", "st_escalate": "st-danger",
+    "reassigned": "st-danger",
     "unknown": "st-unknown",
 }
 # 卡片排序用的緊急程度：數字越小越緊急，排最前面。同一層再依工作天數從多到少排。
 STATUS_PRIORITY = {
-    "escalate": 0, "endcheck": 0, "st_escalate": 0,
+    "escalate": 0, "endcheck": 0, "st_escalate": 0, "reassigned": 0,
     "remind": 1, "midcheck": 1,
     "new": 2, "tracking": 2, "st_tracking": 2,
     "unknown": 3,
 }
 # 需要優先處理／會觸發自動 Gmail 草稿的狀態，集中在這裡管理，避免各處各寫一份漏掉新狀態。
 URGENT_STATUSES = ("escalate", "endcheck", "st_escalate")
+# 報表上獨立的「重分配」虛擬階段名稱，不是 Zoho 裡真的 Stage 值，只在報表顯示用。
+REASSIGNED_STAGE_LABEL = "重分配"
 
 
 # ---------------------------------------------------------------------------
@@ -895,8 +903,8 @@ def render_html(records, generated_at):
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
   <h1>公司名單 / 本月有機會 / 短期追蹤 階段追蹤</h1>
-  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期</div>
-  <div class="stat-line">共 {len(records)} 筆需優先處理（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
+  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期｜重分配：主管剛轉派給新業務、待聯繫的公司名單交易（獨立分類，不算進公司名單數字裡）</div>
+  <div class="stat-line">共 {len(records)} 筆需優先處理（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆、重分配 {stage_counter.get(REASSIGNED_STAGE_LABEL,0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
 </div>
 <div class="sticky-panel">
   <div class="stat-grid">
@@ -904,6 +912,7 @@ def render_html(records, generated_at):
     <div class="stat-box"><div class="num">{stage_counter.get("公司名單",0)}</div><div class="lbl">公司名單可轉派</div></div>
     <div class="stat-box"><div class="num">{stage_counter.get("本月有機會",0)}</div><div class="lbl">本月有機會月底逾期</div></div>
     <div class="stat-box"><div class="num">{stage_counter.get("短期追蹤",0)}</div><div class="lbl">短期追蹤逾期</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get(REASSIGNED_STAGE_LABEL,0)}</div><div class="lbl">重分配待聯繫</div></div>
   </div>
   <div class="notify-toolbar">
     <button class="notify-btn-primary" id="notifyBtn" disabled>寄送提醒信（已勾選 0 筆）</button>
@@ -1169,7 +1178,7 @@ def should_send_reminder(entry, current_status, now, repeat_days=REMIND_REPEAT_D
     return days_since >= repeat_days
 
 
-def run_auto_notify(records):
+def run_auto_notify(records, reassigned):
     """業務個人提醒信。
 
     目前先暫時改回「建草稿」而不是直接寄出（見下面 create_gmail_draft 那行），
@@ -1178,8 +1187,10 @@ def run_auto_notify(records):
 
     一封信最多包含兩段、各自獨立的表格：
     1. 逾期提醒（可轉派／月底檢核／短期追蹤逾期，跟以前一樣）。
-    2. 主管轉派通知（見 detect_reassignments()）：如果這個人今天有新被指派公司名單交易，
-       不管他有沒有逾期提醒都會收到這段，兩段表格分開呈現，不會混在同一個表格裡。
+    2. 主管轉派通知：如果這個人今天有新被指派公司名單交易（reassigned 參數，
+       由 main() 統一呼叫 detect_reassignments() 算好、也同時用在網頁報表上，
+       確保兩邊看到的轉派名單是同一份，不會兜不起來），不管他有沒有逾期提醒都會收到這段，
+       兩段表格分開呈現，不會混在同一個表格裡。
     """
     if not GMAIL_AUTO_NOTIFY_ENABLED:
         print("尚未設定 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN，略過自動寄信提醒功能。")
@@ -1197,8 +1208,6 @@ def run_auto_notify(records):
             continue  # 狀態沒變，而且還沒到重複提醒的天數，不用再寄
         by_owner[(r["業務Email"], r["業務"])].append(r)
 
-    owner_cache = load_owner_cache()
-    reassigned, new_owner_cache = detect_reassignments(records, owner_cache)
     reassigned_by_owner = defaultdict(list)
     for r in reassigned:
         reassigned_by_owner[(r["業務Email"], r["業務"])].append(r)
@@ -1206,7 +1215,6 @@ def run_auto_notify(records):
     all_owner_keys = set(by_owner.keys()) | set(reassigned_by_owner.keys())
     if not all_owner_keys:
         print("沒有新的需優先處理交易，也沒有新的轉派名單，不用寄提醒信。")
-        save_owner_cache(new_owner_cache)
         return
 
     try:
@@ -1251,7 +1259,6 @@ def run_auto_notify(records):
             log[d["id"]] = {"status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id")}
 
     save_draft_log(log)
-    save_owner_cache(new_owner_cache)
     print(f"本次共建立 {sent} 封提醒信草稿（測試階段，尚未改成直接寄出）。")
 
 
@@ -1310,10 +1317,26 @@ def main():
     records, new_cache, api_calls = build_records(token, rows, cache)
     save_cache(new_cache)
 
+    # 主管轉派偵測：只算一次，網頁報表跟自動寄信共用同一份結果，確保兩邊看到的轉派名單一致。
+    owner_cache = load_owner_cache()
+    reassigned, new_owner_cache = detect_reassignments(records, owner_cache)
+    save_owner_cache(new_owner_cache)
+    reassigned_ids = {r["id"] for r in reassigned}
+
     # 快取／自動草稿仍然要看「全部」記錄（追蹤中但天數還沒到門檻的也要一起處理，
     # 這樣快取才不會漏、之後一旦超過門檻才能馬上被抓到），但網頁報表本身只列出
     # 已經滿足三個門檻條件（可轉派／月底檢核／短期追蹤逾期）的交易，正常天數的不顯示。
-    report_records = [r for r in records if r["狀態"] in URGENT_STATUSES]
+    # 剛被轉派的交易另外獨立算一個「重分配」類別，不歸在公司名單底下——
+    # 對新接手的業務來說這是全新的交易，不該顯示成他已經逾期很久。
+    report_records = []
+    for r in records:
+        if r["id"] in reassigned_ids:
+            rr = dict(r)
+            rr["Stage"] = REASSIGNED_STAGE_LABEL
+            rr["狀態"] = "reassigned"
+            report_records.append(rr)
+        elif r["狀態"] in URGENT_STATUSES:
+            report_records.append(r)
 
     generated_at = datetime.now(TAIPEI_TZ).strftime("%Y-%m-%d %H:%M (UTC+8)")
     html_out = render_html(report_records, generated_at)
@@ -1326,7 +1349,7 @@ def main():
     # 只有「寄信」這件事只在工作天（週一~週五）做，週末不打擾業務跟主管。
     # weekday()：週一=0 ... 週五=4，週六=5、週日=6。
     if datetime.now(TAIPEI_TZ).weekday() < 5:
-        run_auto_notify(records)
+        run_auto_notify(records, reassigned)
         run_manager_summary(records)
     else:
         print("今天是週末，報表照常更新，但略過寄信（業務個人提醒信／主管彙整信都只在工作天寄）。")
