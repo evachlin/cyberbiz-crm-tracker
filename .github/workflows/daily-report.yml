@@ -2,10 +2,20 @@ name: Daily Zoho CRM Report
 
 on:
   schedule:
-    # cron 是 UTC 時間。這裡設定 UTC 00:00 = 台北時間(UTC+8) 08:00。
-    # 要改成別的時間，把下面這行的 "0 0" 換成 "分鐘 (小時-8)"，例如台北 09:30 就寫 "30 1"。
+    # cron 是 UTC 時間。這裡設定 UTC 00:17 = 台北時間(UTC+8) 08:17。
+    # 故意不用整點（00:00），因為全世界一堆 repo 都排在整點觸發，GitHub 那邊會塞車，
+    # 常常延遲很久才真的執行；分鐘數錯開一點可以大幅降低塞車機率。
+    # 要改成別的時間，把下面這行的 "17 0" 換成 "分鐘 (小時-8)"，例如台北 09:30 就寫 "30 1"。
     - cron: "17 0 * * *"
-  workflow_dispatch: {}   # 允許在 GitHub 網頁上手動按「Run workflow」立即跑一次，方便測試
+  workflow_dispatch:      # 允許在 GitHub 網頁上手動按「Run workflow」立即跑一次，方便測試
+    inputs:
+      test_mode:
+        description: "測試模式：業務個人提醒信會全部改寄到你自己信箱，不會真的寄給業務（正式排程不受影響，一律正常寄送）"
+        type: choice
+        options:
+          - "true"
+          - "false"
+        default: "true"
 
 permissions:
   contents: write
@@ -36,12 +46,15 @@ jobs:
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
           MANAGER_SUMMARY_EMAIL: ${{ secrets.MANAGER_SUMMARY_EMAIL }}
+          # 只有手動 Run workflow、而且測試模式選 true（預設值）時才會生效，
+          # 正式的每日排程（schedule 觸發）一定是空字串，一律正常直接寄給業務。
+          NOTIFY_TEST_EMAIL: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.test_mode == 'true') && 'eva.ch.lin@cyberbiz.io' || '' }}
         run: python scripts/generate_report.py
 
       - name: Commit updated report
         run: |
           git config user.name "cyberbiz-report-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add docs/index.html data/stage_cache.json data/gmail_draft_log.json
+          git add docs/index.html data/stage_cache.json data/gmail_draft_log.json data/owner_cache.json
           git diff --quiet --cached || git commit -m "chore: 每日自動更新報表 $(date -u +'%Y-%m-%d %H:%M UTC')"
           git push
