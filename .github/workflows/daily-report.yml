@@ -2,11 +2,11 @@ name: Daily Zoho CRM Report
 
 on:
   schedule:
-    # cron 是 UTC 時間。這裡設定 UTC 7:22 = 台北時間(UTC+8) 06:07。
+    # cron 是 UTC 時間。這裡設定 UTC 00:17 = 台北時間(UTC+8) 08:17。
     # 故意不用整點（00:00），因為全世界一堆 repo 都排在整點觸發，GitHub 那邊會塞車，
     # 常常延遲很久才真的執行；分鐘數錯開一點可以大幅降低塞車機率。
     # 要改成別的時間，把下面這行的 "17 0" 換成 "分鐘 (小時-8)"，例如台北 09:30 就寫 "30 1"。
-    - cron: "7 22 * * *"
+    - cron: "17 0 * * *"
   workflow_dispatch:      # 允許在 GitHub 網頁上手動按「Run workflow」立即跑一次，方便測試
     inputs:
       test_mode:
@@ -16,6 +16,13 @@ on:
           - "true"
           - "false"
         default: "true"
+      reassign_full_backfill:
+        description: "重分配全量回補：選 true 的話這次不受最近 3 天限制，會把 2026/1/1 至今所有還在「重分配」階段、還沒被通知過的交易一次補寄出去。只有第一次上線要清歷史積壓時才選 true，補完之後下次 Run workflow 記得改回 false，平常的排程也一律是 false。"
+        type: choice
+        options:
+          - "false"
+          - "true"
+        default: "false"
 
 permissions:
   contents: write
@@ -49,6 +56,8 @@ jobs:
           # 只有手動 Run workflow、而且測試模式選 true（預設值）時才會生效，
           # 正式的每日排程（schedule 觸發）一定是空字串，一律正常直接寄給業務。
           NOTIFY_TEST_EMAIL: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.test_mode == 'true') && 'eva.ch.lin@cyberbiz.io' || '' }}
+          # 只有手動 Run workflow、而且這欄選 true 時才會生效，正式排程一律是 false（只看最近幾天）。
+          REASSIGN_FULL_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reassign_full_backfill == 'true' }}
         run: python scripts/generate_report.py
 
       - name: Commit updated report
