@@ -335,7 +335,8 @@ def fetch_reassigned_deals(token):
     """抓最近 REASSIGN_LOOKBACK_DAYS 天內、Stage 剛被改成「重分配」的交易（只留 ROSTER 業務）。"""
     since = (datetime.now(TAIPEI_TZ) - timedelta(days=REASSIGN_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%S+08:00")
     query = (
-        "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, Modified_Time "
+        "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, Modified_Time, "
+        "Amount, Closing_Date, product_type, visitor_source "
         f"FROM Deals WHERE (Stage = '{REASSIGN_STAGE_NAME}') AND (Modified_Time >= '{since}') "
         "ORDER BY Modified_Time DESC"
     )
@@ -360,9 +361,15 @@ def build_reassigned_records(rows):
             "業務Email": r.get("Owner.email") or "",
             "業務課": team,
             "Stage": REASSIGN_STAGE_NAME,
+            "進入此階段時間": r.get("Modified_Time"),
+            "進入時間備註": "以 Modified_Time 估算重分配時間",
             "工作天數": age,
             "天數單位": "天",
             "狀態": "reassigned",
+            "金額": r.get("Amount"),
+            "預計成交日": r.get("Closing_Date"),
+            "商品類別": r.get("product_type"),
+            "名單來源": r.get("visitor_source"),
         })
     return records
 
@@ -627,7 +634,7 @@ REPORT_SCRIPT = '''<script>
       lines.push("・" + d.name + "（" + d.stage + "，" + daysText(d) + "，" + d.statusLabel + "）");
       lines.push("   點我開啟這筆交易：" + d.crmUrl);
     });
-    lines.push("", "如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
+    lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
     // Gmail 網頁版的寫信網址，不是 mailto:（mailto 需要瀏覽器/系統註冊處理常式，
     // 公司網域管理的 Chrome 設定檔常常鎖掉這個權限，導致完全沒反應）。
@@ -1109,7 +1116,7 @@ def build_notify_html(owner_name, deals, reassigned_deals=None):
         overdue_section = f'''
   <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
   {_build_deals_table_html(deals)}
-  <p>如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>'''
+  <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>'''
 
     reassigned_section = ""
     if reassigned_deals:
