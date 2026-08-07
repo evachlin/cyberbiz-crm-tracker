@@ -1050,7 +1050,7 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
@@ -1104,6 +1104,17 @@ _RULE_REMINDER_HTML = '''
   </p>'''
 
 
+def _reassign_period_phrase():
+    """
+    重分配通知信裡「你＿＿＿收到」的時間描述。平常日（週二~週五寄信）快取只隔一天，
+    寫「昨天」就好；但週一寄信時，快取比對的對象是上次「真的寄過信」那天（也就是上週五），
+    中間跨了六、日兩天週末，所以週一要把週五、六、日都涵蓋進去，不能只講昨天（週日）。
+    """
+    if datetime.now(TAIPEI_TZ).weekday() == 0:  # 週一
+        return "上週五、六、日"
+    return "昨天"
+
+
 def build_notify_html(owner_name, deals, reassigned_deals=None):
     """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。
     reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
@@ -1121,7 +1132,7 @@ def build_notify_html(owner_name, deals, reassigned_deals=None):
     reassigned_section = ""
     if reassigned_deals:
         reassigned_section = f'''
-  <p><b>另外，你在昨天(或禮拜五)收到 {len(reassigned_deals)} 筆重分配的名單，再麻煩盡快聯繫客戶：</b></p>
+  <p><b>另外，你{_reassign_period_phrase()}收到 {len(reassigned_deals)} 筆重分配的名單，再麻煩盡快聯繫客戶：</b></p>
   {_build_deals_table_html(reassigned_deals)}'''
 
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
@@ -1368,15 +1379,13 @@ def main():
     records, new_cache, api_calls = build_records(token, rows, cache)
     save_cache(new_cache)
 
-    # 主管轉派偵測：只算一次，網頁報表跟自動寄信共用同一份結果，確保兩邊看到的轉派名單一致。
-    # 直接查 Zoho 裡真實的「重分配」Stage（見 fetch_reassigned_deals），不再用 Owner 欄位
-    # 每日比對去猜——實測發現公司名單階段裡從來沒有真的抓到過 Owner 變化，
+    # 主管轉派偵測：直接查 Zoho 裡真實的「重分配」Stage（見 fetch_reassigned_deals），
+    # 不再用 Owner 欄位每日比對去猜——實測發現公司名單階段裡從來沒有真的抓到過 Owner 變化，
     # 因為主管轉派時是直接把 Stage 改成「重分配」，不是單純換 Owner。
-    reassign_cache = load_reassign_cache()
+    # 報表顯示用的 reassigned_all 每天都直接抓最新資料，不跟快取比對（報表本來就該顯示
+    # 目前實際狀況，不用管有沒有通知過）。
     reassign_rows = fetch_reassigned_deals(token)
-    reassigned_all = build_reassigned_records(reassign_rows)  # 報表用：最近幾天內的重分配交易，全部列出
-    reassigned, new_reassign_cache = diff_new_reassignments(reassigned_all, reassign_cache)  # 寄信用：只有「這次才第一次看到」的才通知
-    save_reassign_cache(new_reassign_cache)
+    reassigned_all = build_reassigned_records(reassign_rows)
 
     # 快取／自動草稿仍然要看「全部」記錄（追蹤中但天數還沒到門檻的也要一起處理，
     # 這樣快取才不會漏、之後一旦超過門檻才能馬上被抓到），但網頁報表本身只列出
@@ -1394,11 +1403,20 @@ def main():
     # 網頁報表照常每天更新（週末排程一樣會跑、天數一樣會重新計算），
     # 只有「寄信」這件事只在工作天（週一~週五）做，週末不打擾業務跟主管。
     # weekday()：週一=0 ... 週五=4，週六=5、週日=6。
+    #
+    # 重分配的通知快取（reassign_cache）刻意也放在這個工作天判斷裡面才讀寫，不是每天都存檔：
+    # 如果假日也更新快取，週五、六、日新增的重分配會在假日的報表更新時就被記錄成「看過了」，
+    # 等到週一才寄信時反而抓不到、漏寄。快取只在真的要寄信的這一刻才比對／存檔，
+    # 這樣週一寄信時比對的還是上次「真的寄過信」那天（通常是上週五）的快取，
+    # 週五、六、日這三天新增的重分配會一次被抓到、合併成一封信通知，不會漏掉假日的部分。
     if datetime.now(TAIPEI_TZ).weekday() < 5:
-        run_auto_notify(records, reassigned)
+        reassign_cache = load_reassign_cache()
+        reassigned_new, new_reassign_cache = diff_new_reassignments(reassigned_all, reassign_cache)
+        save_reassign_cache(new_reassign_cache)
+        run_auto_notify(records, reassigned_new)
         run_manager_summary(records)
     else:
-        print("今天是週末，報表照常更新，但略過寄信（業務個人提醒信／主管彙整信都只在工作天寄）。")
+        print("今天是週末，報表照常更新，但略過寄信（業務個人提醒信／主管彙整信都只在工作天寄，重分配快取也不會在今天更新）。")
 
     print(f"完成。共 {len(records)} 筆，本次呼叫 Timeline API {api_calls} 次（快取命中 {len(rows) - api_calls} 筆）。")
 
