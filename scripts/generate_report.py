@@ -90,6 +90,11 @@ REASSIGN_CACHE_PATH = os.path.join(REPO_ROOT, "data", "reassign_cache.json")
 # 確保週一早上還能抓到週五才被轉派的交易。
 REASSIGN_STAGE_NAME = "重分配"
 REASSIGN_LOOKBACK_DAYS = 3
+# 只有手動 Run workflow、且這個環境變數選 true 時才會生效（見 daily-report.yml 的
+# reassign_full_backfill 選項）：這次不受最近 REASSIGN_LOOKBACK_DAYS 天限制，
+# 改成從 TRACK_SINCE（2026/1/1）開始把所有還在「重分配」、還沒被通知過的歷史積壓
+# 一次抓出來通知。第一次上線清歷史積壓用一次就好，平常的排程一律是 false。
+REASSIGN_FULL_BACKFILL = (os.environ.get("REASSIGN_FULL_BACKFILL") or "").lower() == "true"
 
 # ---------------------------------------------------------------------------
 # 業務課對照表：跟 Zoho 裡的 Owner email 對應。人員異動時只要改這裡。
@@ -100,6 +105,7 @@ ROSTER = {
     "ryder.wu@cyberbiz.io": ("Ryder Wu", "業務一課"),
     "sarah.lin@cyberbiz.io": ("Sarah Lin", "業務一課"),
     "eason.hsiao@cyberbiz.io": ("Eason Hsiao", "業務二課"),
+    "justin.tsao@cyberbiz.io": ("Justin Tsao", "業務二課"),
     "josh.wu@cyberbiz.io": ("Josh Wu", "業務二課"),
     "steven.lin@cyberbiz.io": ("Steven Lin", "業務二課"),
     "andy.zhuang@cyberbiz.io": ("Andy Zhuang", "業務二課"),
@@ -273,6 +279,18 @@ def parse_zoho_dt(s):
     return datetime.fromisoformat(s)
 
 
+def _backfill_range_label():
+    """
+    全量回補模式的日期區間文字，例如「2026/1/1-8/9」。故意不用「至今」這種相對講法——
+    信件可能不是當天馬上被看到，「至今」會讓人搞不清楚實際涵蓋到哪一天。
+    起始日固定是 TRACK_SINCE（2026/1/1），結束日是「跑這次的前一天」（比對她原本的規劃：
+    週一跑回補，涵蓋到週日／上個工作天為止）。
+    """
+    start_dt = parse_zoho_dt(TRACK_SINCE)
+    end_dt = datetime.now(TAIPEI_TZ) - timedelta(days=1)
+    return f"{start_dt.year}/{start_dt.month}/{start_dt.day}-{end_dt.month}/{end_dt.day}"
+
+
 def workdays_between(start_dt, end_dt):
     if start_dt is None:
         return None
@@ -331,8 +349,14 @@ def save_reassign_cache(cache):
 
 
 def fetch_reassigned_deals(token):
-    """抓最近 REASSIGN_LOOKBACK_DAYS 天內、Stage 剛被改成「重分配」的交易（只留 ROSTER 業務）。"""
-    since = (datetime.now(TAIPEI_TZ) - timedelta(days=REASSIGN_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%S+08:00")
+    """抓 Stage 剛被改成「重分配」的交易（只留 ROSTER 業務）。
+    平常只看最近 REASSIGN_LOOKBACK_DAYS 天；REASSIGN_FULL_BACKFILL 開啟時改成從
+    TRACK_SINCE（2026/1/1）開始抓全部，用來一次清歷史積壓。"""
+    if REASSIGN_FULL_BACKFILL:
+        since = TRACK_SINCE
+        print(f"⚠️ 重分配全量回補模式開啟：這次會抓 {since} 至今所有還在「重分配」的交易，不受最近 {REASSIGN_LOOKBACK_DAYS} 天限制。")
+    else:
+        since = (datetime.now(TAIPEI_TZ) - timedelta(days=REASSIGN_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%S+08:00")
     query = (
         "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, Modified_Time, "
         "Amount, Closing_Date, product_type, visitor_source "
@@ -949,7 +973,7 @@ def render_html(records, generated_at):
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
   <h1>公司名單 / 本月有機會 / 短期追蹤 階段追蹤</h1>
-  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期｜重分配：Zoho 裡 Stage 已被主管改成「重分配」、最近 {REASSIGN_LOOKBACK_DAYS} 天內待新業務聯繫的交易（獨立分類，不算進其他階段數字裡）</div>
+  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期｜重分配：Zoho 裡 Stage 已被主管改成「重分配」、{(_backfill_range_label() + "（全量回補模式）") if REASSIGN_FULL_BACKFILL else f"最近 {REASSIGN_LOOKBACK_DAYS} 天內"}待新業務聯繫的交易（獨立分類，不算進其他階段數字裡）</div>
   <div class="stat-line">共 {len(records)} 筆需優先處理（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆、重分配 {stage_counter.get(REASSIGNED_STAGE_LABEL,0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
 </div>
 <div class="sticky-panel">
@@ -1049,14 +1073,14 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
 
 
 def _build_deals_table_html(deals):
-    """把一份交易清單組成統一格式的表格（交易名稱／階段／天數／規則），依天數多到少排序。"""
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
     w1, w2, w3, w4 = _TABLE_COL_WIDTHS
     deals_sorted = sorted(
         deals,
@@ -1083,7 +1107,7 @@ def _build_deals_table_html(deals):
       <tr style="background:#f7f2e8;">
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
       </tr>
     </thead>
@@ -1108,6 +1132,8 @@ def _reassign_period_phrase():
     重分配通知信裡「你＿＿＿收到」的時間描述。平常日（週二~週五寄信）快取只隔一天，
     寫「昨天」就好；但週一寄信時，快取比對的對象是上次「真的寄過信」那天（也就是上週五），
     中間跨了六、日兩天週末，所以週一要把週五、六、日都涵蓋進去，不能只講昨天（週日）。
+    全量回補模式（REASSIGN_FULL_BACKFILL）不會用到這個函式——那批是從 2026/1/1 累積至今
+    的歷史積壓，不是「最近收到」的事件，改用不同的句型（見 build_notify_html）。
     """
     if datetime.now(TAIPEI_TZ).weekday() == 0:  # 週一
         return "上週五、六、日"
@@ -1115,7 +1141,7 @@ def _reassign_period_phrase():
 
 
 def build_notify_html(owner_name, deals, reassigned_deals=None):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。
     reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
     跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人這次
     只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
@@ -1130,8 +1156,14 @@ def build_notify_html(owner_name, deals, reassigned_deals=None):
 
     reassigned_section = ""
     if reassigned_deals:
+        if REASSIGN_FULL_BACKFILL:
+            # 一次性歷史回補：這不是「最近收到」的事件，是目前累積還沒聯繫的存量，
+            # 用「你目前有幾筆」而不是「你＿＿＿收到幾筆」，語意才正確。
+            reassigned_intro = f"你目前有 {len(reassigned_deals)} 筆重分配的名單（{_backfill_range_label()} 累積、尚未聯繫），麻煩盡快聯繫客戶："
+        else:
+            reassigned_intro = f"你{_reassign_period_phrase()}收到 {len(reassigned_deals)} 筆重分配的名單，再麻煩盡快聯繫客戶："
         reassigned_section = f'''
-  <p><b>另外，你{_reassign_period_phrase()}收到 {len(reassigned_deals)} 筆重分配的名單，再麻煩盡快聯繫客戶：</b></p>
+  <p><b>另外，{reassigned_intro}</b></p>
   {_build_deals_table_html(reassigned_deals)}'''
 
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
@@ -1294,12 +1326,13 @@ def run_auto_notify(records, reassigned):
         deals = by_owner.get((owner_email, owner_name), [])
         reassigned_deals = reassigned_by_owner.get((owner_email, owner_name), [])
 
+        reassigned_wording = f"你目前有 {len(reassigned_deals)} 筆重分配名單待聯繫（歷史回補）" if REASSIGN_FULL_BACKFILL else f"你收到 {len(reassigned_deals)} 筆主管轉派的交易"
         if deals and reassigned_deals:
-            subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需更新進度＋{len(reassigned_deals)} 筆新轉派名單"
+            subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需更新進度＋{len(reassigned_deals)} 筆重分配名單"
         elif deals:
             subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
         else:
-            subject = f"【ZOHO交易階段提醒】{owner_name} 你收到 {len(reassigned_deals)} 筆主管轉派的交易"
+            subject = f"【ZOHO交易階段提醒】{owner_name} {reassigned_wording}"
 
         if NOTIFY_TEST_EMAIL:
             subject = f"[測試模式，原收件人：{owner_name} <{owner_email}>] {subject}"
