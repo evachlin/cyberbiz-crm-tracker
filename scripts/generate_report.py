@@ -80,6 +80,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_PATH = os.path.join(REPO_ROOT, "data", "stage_cache.json")
 DRAFT_LOG_PATH = os.path.join(REPO_ROOT, "data", "gmail_draft_log.json")
 OUTPUT_HTML_PATH = os.path.join(REPO_ROOT, "docs", "index.html")
+# 記錄「公司名單」交易上一次看到的 Owner，用來偵測主管轉派：
+# 如果同一筆交易今天的 Owner 跟快取裡不一樣，代表被轉派給別人了，要通知新接手的業務。
+OWNER_CACHE_PATH = os.path.join(REPO_ROOT, "data", "owner_cache.json")
 
 # ---------------------------------------------------------------------------
 # 業務課對照表：跟 Zoho 裡的 Owner email 對應。人員異動時只要改這裡。
@@ -305,6 +308,42 @@ def save_cache(cache):
     os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
     with open(CACHE_PATH, "w", encoding="utf-8") as f:
         json.dump(cache, f, ensure_ascii=False, indent=1)
+
+
+def load_owner_cache():
+    if os.path.exists(OWNER_CACHE_PATH):
+        with open(OWNER_CACHE_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_owner_cache(cache):
+    os.makedirs(os.path.dirname(OWNER_CACHE_PATH), exist_ok=True)
+    with open(OWNER_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False, indent=1)
+
+
+def detect_reassignments(records, owner_cache):
+    """
+    比對「公司名單」交易這次抓到的 Owner，跟上次快取的 Owner 是否不同，
+    藉此偵測主管轉派。只認公司名單這個階段（配合目前主管彙整信的轉派流程），
+    也只在「上次有看過這筆交易、而且 Owner 真的不一樣」時才算轉派；
+    第一次看到的交易（快取裡沒有）不算轉派，只是先記錄基準值，避免第一次跑就整批誤判。
+    回傳：(reassigned 的 records 列表，更新後的 owner_cache)
+    """
+    new_cache = dict(owner_cache)
+    reassigned = []
+    for r in records:
+        if r["Stage"] != "公司名單":
+            continue
+        rid = r["id"]
+        new_owner = r["業務Email"]
+        old_owner = owner_cache.get(rid)
+        if old_owner and new_owner and old_owner != new_owner:
+            reassigned.append(r)
+        if new_owner:
+            new_cache[rid] = new_owner
+    return reassigned, new_cache
 
 
 def resolve_owner(email, first_name, last_name):
@@ -540,7 +579,7 @@ REPORT_SCRIPT = '''<script>
       lines.push("・" + d.name + "（" + d.stage + "，" + daysText(d) + "，" + d.statusLabel + "）");
       lines.push("   點我開啟這筆交易：" + d.crmUrl);
     });
-    lines.push("", "如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
+    lines.push("", "如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。", "", "謝謝！");
     var body = lines.join("\\n");
     // Gmail 網頁版的寫信網址，不是 mailto:（mailto 需要瀏覽器/系統註冊處理常式，
     // 公司網域管理的 Chrome 設定檔常常鎖掉這個權限，導致完全沒反應）。
@@ -1009,13 +1048,30 @@ _RULE_REMINDER_HTML = '''
   </p>'''
 
 
-def build_notify_html(owner_name, deals):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。"""
-    return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
-  <p>{esc(owner_name)} 你好，</p>
+def build_notify_html(owner_name, deals, reassigned_deals=None):
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。
+    reassigned_deals（選填）：主管剛轉派給這位業務的公司名單交易，會另外用一個獨立表格呈現，
+    跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人今天
+    只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
+    reassigned_deals = reassigned_deals or []
+
+    overdue_section = ""
+    if deals:
+        overdue_section = f'''
   <p>以下 {len(deals)} 筆交易目前停留在原階段已經一段時間，麻煩抽空看一下，更新最新進度或判斷結果：</p>
   {_build_deals_table_html(deals)}
-  <p>如果其實已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>
+  <p>如果已經處理了、只是系統還沒更新，也麻煩補填一下最新狀態，避免被誤判成沒進度。</p>'''
+
+    reassigned_section = ""
+    if reassigned_deals:
+        reassigned_section = f'''
+  <p><b>另外，你昨天收到 {len(reassigned_deals)} 筆主管轉派的公司名單交易，麻煩盡快聯繫客戶：</b></p>
+  {_build_deals_table_html(reassigned_deals)}'''
+
+    return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
+  <p>{esc(owner_name)} 你好，</p>
+  {overdue_section}
+  {reassigned_section}
   <p>謝謝！</p>
   {_RULE_REMINDER_HTML}
 </div>'''
@@ -1114,14 +1170,24 @@ def should_send_reminder(entry, current_status, now, repeat_days=REMIND_REPEAT_D
 
 
 def run_auto_notify(records):
-    """業務個人提醒信：直接寄出，不再是建草稿、不需要人工按送出。
-    （寄給 Ambrose 的主管彙整信不受影響，還是走 create_gmail_draft 建草稿，維持人工看過再送。）"""
+    """業務個人提醒信。
+
+    目前先暫時改回「建草稿」而不是直接寄出（見下面 create_gmail_draft 那行），
+    因為剛加入「主管轉派通知」這個新功能，先建草稿讓 Eva 確認合併後的信件格式沒問題，
+    確認 OK 之後再把 create_gmail_draft(...) 換回 send_gmail_message(...) 恢復直接寄出。
+
+    一封信最多包含兩段、各自獨立的表格：
+    1. 逾期提醒（可轉派／月底檢核／短期追蹤逾期，跟以前一樣）。
+    2. 主管轉派通知（見 detect_reassignments()）：如果這個人今天有新被指派公司名單交易，
+       不管他有沒有逾期提醒都會收到這段，兩段表格分開呈現，不會混在同一個表格裡。
+    """
     if not GMAIL_AUTO_NOTIFY_ENABLED:
         print("尚未設定 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN，略過自動寄信提醒功能。")
         return
 
     log = load_draft_log()
     now = datetime.now(TAIPEI_TZ)
+
     by_owner = defaultdict(list)
     for r in records:
         if r["狀態"] not in URGENT_STATUSES:
@@ -1131,8 +1197,16 @@ def run_auto_notify(records):
             continue  # 狀態沒變，而且還沒到重複提醒的天數，不用再寄
         by_owner[(r["業務Email"], r["業務"])].append(r)
 
-    if not by_owner:
-        print("沒有新的需優先處理交易需要寄提醒信。")
+    owner_cache = load_owner_cache()
+    reassigned, new_owner_cache = detect_reassignments(records, owner_cache)
+    reassigned_by_owner = defaultdict(list)
+    for r in reassigned:
+        reassigned_by_owner[(r["業務Email"], r["業務"])].append(r)
+
+    all_owner_keys = set(by_owner.keys()) | set(reassigned_by_owner.keys())
+    if not all_owner_keys:
+        print("沒有新的需優先處理交易，也沒有新的轉派名單，不用寄提醒信。")
+        save_owner_cache(new_owner_cache)
         return
 
     try:
@@ -1146,20 +1220,29 @@ def run_auto_notify(records):
 
     sent = 0
     now_iso = datetime.now(TAIPEI_TZ).isoformat()
-    for (owner_email, owner_name), deals in by_owner.items():
+    for owner_email, owner_name in all_owner_keys:
         if not owner_email:
             print(f"{owner_name} 沒有 email，略過自動寄信，請手動聯絡。")
             continue
-        subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
+        deals = by_owner.get((owner_email, owner_name), [])
+        reassigned_deals = reassigned_by_owner.get((owner_email, owner_name), [])
+
+        if deals and reassigned_deals:
+            subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需更新進度＋{len(reassigned_deals)} 筆新轉派名單"
+        elif deals:
+            subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
+        else:
+            subject = f"【ZOHO交易階段提醒】{owner_name} 你收到 {len(reassigned_deals)} 筆主管轉派的公司名單交易"
+
         if NOTIFY_TEST_EMAIL:
             subject = f"[測試模式，原收件人：{owner_name} <{owner_email}>] {subject}"
-        html_body = build_notify_html(owner_name, deals)
+        html_body = build_notify_html(owner_name, deals, reassigned_deals)
         to_email = NOTIFY_TEST_EMAIL or owner_email
         msg = build_mime_message(to_email, subject, html_body)
         try:
-            result = send_gmail_message(token, msg)
+            result = create_gmail_draft(token, msg)  # 測試階段先建草稿，確認沒問題後改回 send_gmail_message
         except requests.exceptions.RequestException as e:
-            print(f"寄給 {owner_name} 的提醒信失敗（{e.__class__.__name__}）：{e}")
+            print(f"幫 {owner_name} 建立提醒信失敗（{e.__class__.__name__}）：{e}")
             continue
         sent += 1
         if NOTIFY_TEST_EMAIL:
@@ -1168,7 +1251,8 @@ def run_auto_notify(records):
             log[d["id"]] = {"status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id")}
 
     save_draft_log(log)
-    print(f"本次共直接寄出 {sent} 封提醒信，收件人是各自的業務本人，不需要再手動確認送出。")
+    save_owner_cache(new_owner_cache)
+    print(f"本次共建立 {sent} 封提醒信草稿（測試階段，尚未改成直接寄出）。")
 
 
 def run_manager_summary(records):
@@ -1238,8 +1322,14 @@ def main():
     with open(OUTPUT_HTML_PATH, "w", encoding="utf-8") as f:
         f.write(html_out)
 
-    run_auto_notify(records)
-    run_manager_summary(records)
+    # 網頁報表照常每天更新（週末排程一樣會跑、天數一樣會重新計算），
+    # 只有「寄信」這件事只在工作天（週一~週五）做，週末不打擾業務跟主管。
+    # weekday()：週一=0 ... 週五=4，週六=5、週日=6。
+    if datetime.now(TAIPEI_TZ).weekday() < 5:
+        run_auto_notify(records)
+        run_manager_summary(records)
+    else:
+        print("今天是週末，報表照常更新，但略過寄信（業務個人提醒信／主管彙整信都只在工作天寄）。")
 
     print(f"完成。共 {len(records)} 筆，本次呼叫 Timeline API {api_calls} 次（快取命中 {len(rows) - api_calls} 筆）。")
 
