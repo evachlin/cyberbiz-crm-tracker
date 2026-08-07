@@ -2,11 +2,11 @@ name: Daily Zoho CRM Report
 
 on:
   schedule:
-    # cron 是 UTC 時間。這裡設定 UTC 00:17 = 台北時間(UTC+8) 08:17。
+    # cron 是 UTC 時間。這裡設定 UTC 7:22 = 台北時間(UTC+8) 06:07。
     # 故意不用整點（00:00），因為全世界一堆 repo 都排在整點觸發，GitHub 那邊會塞車，
     # 常常延遲很久才真的執行；分鐘數錯開一點可以大幅降低塞車機率。
     # 要改成別的時間，把下面這行的 "17 0" 換成 "分鐘 (小時-8)"，例如台北 09:30 就寫 "30 1"。
-    - cron: "17 0 * * *"
+    - cron: "7 22 * * *"
   workflow_dispatch:      # 允許在 GitHub 網頁上手動按「Run workflow」立即跑一次，方便測試
     inputs:
       test_mode:
