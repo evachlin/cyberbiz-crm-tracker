@@ -150,10 +150,12 @@ SHORT_TERM_ESCALATE_DAYS = 90
 
 # 重複提醒：交易進入某個「需優先處理」狀態後，如果業務一直沒處理、狀態也沒變，
 # 隔幾天要再提醒一次（不然預設只會提醒一次，之後不管拖多久都不會再收到信）。
-# 業務個人提醒信（三個階段共用）跟寄給主管的公司名單彙整信，用不同的重複間隔：
-# 業務個人的怕太頻繁疲乏，7 天一次；主管彙整信跟主管討論過，希望更緊盯轉派決策，改成 2 天一次。
-# 都是用「距離上次建立草稿的日曆天數」判斷，跟工作天／日曆天的天數計算方式無關。
-REMIND_REPEAT_DAYS = 7
+# 業務個人提醒信三個狀態（公司名單可轉派 escalate／本月有機會月底檢核 endcheck／
+# 短期追蹤逾期 st_escalate）統一都是 3 個工作天一次（從上次提醒那天起算，跳過週末）。
+# 公司名單原本是 7 天，現在因為每封信都會同步 CC 給 Ambrose，改成跟另外兩個狀態一致的
+# 3 個工作天，緊盯的頻率一樣。
+# 主管彙整信另外用日曆天算，2 天一次，跟主管討論過，希望更緊盯轉派決策。
+URGENT_REMIND_REPEAT_WORKDAYS = 3
 MANAGER_SUMMARY_REMIND_REPEAT_DAYS = 2
 
 
@@ -1073,14 +1075,14 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
 
 
 def _build_deals_table_html(deals):
-    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／天數／規則），依天數多到少排序。"""
     w1, w2, w3, w4 = _TABLE_COL_WIDTHS
     deals_sorted = sorted(
         deals,
@@ -1107,7 +1109,7 @@ def _build_deals_table_html(deals):
       <tr style="background:#f7f2e8;">
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
       </tr>
     </thead>
@@ -1141,7 +1143,7 @@ def _reassign_period_phrase():
 
 
 def build_notify_html(owner_name, deals, reassigned_deals=None):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。
     reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
     跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人這次
     只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
@@ -1242,15 +1244,16 @@ def send_gmail_message(token, msg):
     return resp.json()
 
 
-def should_send_reminder(entry, current_status, now, repeat_days=REMIND_REPEAT_DAYS):
+def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_REPEAT_WORKDAYS, count_workdays=True):
     """
     判斷這筆交易現在要不要（再）建立一封提醒草稿。
     - 之前從沒建過草稿：要建。
     - 狀態變了（例如本月有機會從月中檢核變月底檢核）：一定要重新建一次，不管天數。
-    - 狀態沒變，但距離上次建立草稿已經超過 repeat_days 天，業務還是沒處理：重複提醒一次。
+    - 狀態沒變，但距離上次建立草稿已經超過 repeat_days，業務還是沒處理：重複提醒一次。
     - 狀態沒變、也還沒到重複提醒的天數：不用再建，避免同一件事每天疲勞轟炸。
-    repeat_days 預設是業務個人提醒信用的 REMIND_REPEAT_DAYS（7天）；
-    主管彙整信另外傳 MANAGER_SUMMARY_REMIND_REPEAT_DAYS（2天），間隔比較短。
+    預設是業務個人提醒信用的 URGENT_REMIND_REPEAT_WORKDAYS（3 個工作天，count_workdays=True）；
+    主管彙整信另外傳 repeat_days=MANAGER_SUMMARY_REMIND_REPEAT_DAYS、count_workdays=False
+    （2 天，用日曆天算，間隔比較短）。
     """
     if not entry:
         return True
@@ -1265,6 +1268,9 @@ def should_send_reminder(entry, current_status, now, repeat_days=REMIND_REPEAT_D
         return True
     if last_dt.tzinfo is None:
         last_dt = last_dt.replace(tzinfo=TAIPEI_TZ)
+    if count_workdays:
+        days_since = workdays_between(last_dt, now)
+        return (days_since or 0) >= repeat_days
     days_since = (now - last_dt).total_seconds() / 86400
     return days_since >= repeat_days
 
@@ -1295,6 +1301,8 @@ def run_auto_notify(records, reassigned):
         if r["狀態"] not in URGENT_STATUSES:
             continue
         entry = log.get(r["id"])
+        # 公司名單可轉派／本月有機會月底檢核／短期追蹤逾期，統一 3 個工作天沒處理就再提醒一次
+        # （公司名單原本是 7 天，現在因為會同步 CC 給 Ambrose，改成跟另外兩個一致）。
         if not should_send_reminder(entry, r["狀態"], now):
             continue  # 狀態沒變，而且還沒到重複提醒的天數，不用再寄
         by_owner[(r["業務Email"], r["業務"])].append(r)
@@ -1373,7 +1381,7 @@ def run_manager_summary(records):
         if r["工作天數"] is None or r["工作天數"] < COMPANY_LIST_MANAGER_ESCALATE_DAY:
             continue
         entry = manager_log.get(r["id"])
-        if not should_send_reminder(entry, r["狀態"], now, repeat_days=MANAGER_SUMMARY_REMIND_REPEAT_DAYS):
+        if not should_send_reminder(entry, r["狀態"], now, repeat_days=MANAGER_SUMMARY_REMIND_REPEAT_DAYS, count_workdays=False):
             continue
         pending.append(r)
 
