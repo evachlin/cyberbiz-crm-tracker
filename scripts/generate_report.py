@@ -32,6 +32,7 @@ import os
 import json
 import html
 import time
+import calendar
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict, Counter
 from email.message import EmailMessage
@@ -105,6 +106,7 @@ ROSTER = {
     "ryder.wu@cyberbiz.io": ("Ryder Wu", "業務一課"),
     "sarah.lin@cyberbiz.io": ("Sarah Lin", "業務一課"),
     "eason.hsiao@cyberbiz.io": ("Eason Hsiao", "業務二課"),
+    "justin.tsao@cyberbiz.io": ("Justin Tsao", "業務二課"),
     "josh.wu@cyberbiz.io": ("Josh Wu", "業務二課"),
     "steven.lin@cyberbiz.io": ("Steven Lin", "業務二課"),
     "andy.zhuang@cyberbiz.io": ("Andy Zhuang", "業務二課"),
@@ -127,12 +129,22 @@ ROSTER = {
 }
 TEAM_ORDER = ["業務一課", "業務二課", "業務三課", "業務四課", "POS", "Ambrose"]
 
+# 業務個人提醒信除了固定 CC 給 Ambrose，特定課別還要額外 CC 給課長。
+# 課長自己收到的提醒信不會 CC 給自己（只 CC Ambrose），見 run_auto_notify 裡的判斷。
+TEAM_EXTRA_CC = {
+    "業務二課": "sabrina.hua@cyberbiz.io",   # Sabrina Hua
+    "業務三課": "william.wang@cyberbiz.io",  # William Wang
+}
+
 # 報表跟自動草稿都只處理 ROSTER 裡列出的這些人，Owner 不在上面這份名單裡的交易一律不會
 # 出現在報表或草稿裡（不是資料遺漏，是刻意過濾掉）。要放行更多人，把 email 加進 ROSTER 即可，
 # 不需要另外改這個過濾邏輯。
 ROSTER_ONLY_FILTER = True
 
-STAGES_TRACKED = ["公司名單", "本月有機會", "短期追蹤"]
+STAGES_TRACKED = [
+    "公司名單", "本月有機會", "短期追蹤",
+    "待約Demo", "保留中", "長期追蹤", "本月確認付款",
+]
 TRACK_SINCE = "2026-01-01T00:00:00+08:00"  # 只追蹤這個日期之後建立的交易，避免把歷史上所有卡在這幾個階段的舊資料全抓進來
 
 # 規則門檻（工作天，只排除週六週日，尚未納入國定假日 —— 之後要補請看 README）
@@ -146,6 +158,16 @@ OPPORTUNITY_MIDCHECK_DAY = 11    # 月中檢核
 OPPORTUNITY_ENDCHECK_DAY = 22    # 月底檢核
 # 短期追蹤：只有一個門檻，用「日曆天」算（不是工作天），超過就標記需優先處理
 SHORT_TERM_ESCALATE_DAYS = 90
+
+# 待約Demo（一個月內）：門檻跟本月有機會一樣，第 11 個工作天月中檢核、第 22 個工作天月底檢核。
+DEMO_MIDCHECK_DAY = 11
+DEMO_ENDCHECK_DAY = 22
+# 保留中／長期追蹤：用真的日曆月份計算（不是簡化的固定天數），滿 X 個月又 1 天才逾期。
+# 例如 1/15 進入階段，滿 6 個月+1 天就是 7/16（見 add_months() 處理月底溢位）。
+HOLD_MONTHS = 6           # 保留中：滿 6 個月+1 天提醒
+LONG_TERM_MONTHS = 3      # 長期追蹤：滿 3 個月+1 天提醒
+# 本月確認付款：不是看交易進入階段多久，而是「每個月最後一個工作天」固定提醒一次，
+# 把當時還停留在這個階段的交易全部列出來（見 is_last_workday_of_month()）。
 
 # 重複提醒：交易進入某個「需優先處理」狀態後，如果業務一直沒處理、狀態也沒變，
 # 隔幾天要再提醒一次（不然預設只會提醒一次，之後不管拖多久都不會再收到信）。
@@ -320,6 +342,27 @@ def calendar_days_between(start_dt, end_dt):
     return max((end - start).days, 0)
 
 
+def add_months(dt, months):
+    """
+    保留中／長期追蹤用：幫 datetime 加上整數個月，正確處理月底溢位——
+    例如 1/31 加 1 個月要變成 2/28（或閏年 2/29），不能直接變成 3/3。
+    """
+    month_index = dt.month - 1 + months
+    year = dt.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(dt.day, calendar.monthrange(year, month)[1])
+    return dt.replace(year=year, month=month, day=day)
+
+
+def is_last_workday_of_month(dt):
+    """本月確認付款用：判斷 dt 當天是不是這個月最後一個工作天（月底如果是週末，往前找到週五）。"""
+    last_day = calendar.monthrange(dt.year, dt.month)[1]
+    d = dt.replace(day=last_day)
+    while d.weekday() >= 5:  # 週六=5、週日=6，往前一天
+        d -= timedelta(days=1)
+    return dt.date() == d.date()
+
+
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
@@ -427,7 +470,8 @@ def fetch_current_deals(token):
     stages_sql = ",".join(f"'{s}'" for s in STAGES_TRACKED)
     query = (
         "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, "
-        "Stage, Created_Time, Modified_Time, Amount, Closing_Date, product_type, visitor_source "
+        "Stage, Created_Time, Modified_Time, Last_Activity_Time, Amount, Closing_Date, "
+        "product_type, visitor_source "
         f"FROM Deals WHERE (Stage in ({stages_sql})) AND (Created_Time >= '{TRACK_SINCE}') "
         "ORDER BY Created_Time ASC"
     )
@@ -503,7 +547,7 @@ def build_records(token, rows, cache):
                 status = "midcheck"
             else:
                 status = "tracking"
-        else:  # 短期追蹤：用日曆天算，只有一個門檻
+        elif stage == "短期追蹤":  # 用日曆天算，只有一個門檻
             age = calendar_days_between(entered_dt, now) if entered_dt else None
             age_unit = "天"
             if age is None:
@@ -512,6 +556,40 @@ def build_records(token, rows, cache):
                 status = "st_escalate"
             else:
                 status = "st_tracking"
+        elif stage == "待約Demo":  # 門檻跟本月有機會一樣
+            age = workdays_between(entered_dt, now) if entered_dt else None
+            age_unit = "個工作天"
+            if age is None:
+                status = "unknown"
+            elif age >= DEMO_ENDCHECK_DAY:
+                status = "demo_endcheck"
+            elif age >= DEMO_MIDCHECK_DAY:
+                status = "demo_midcheck"
+            else:
+                status = "demo_tracking"
+        elif stage == "保留中":  # 滿 6 個月+1 天，用真的日曆月份算
+            age_unit = "天"
+            if entered_dt is None:
+                age, status = None, "unknown"
+            else:
+                age = calendar_days_between(entered_dt, now)
+                threshold_dt = add_months(entered_dt, HOLD_MONTHS) + timedelta(days=1)
+                status = "hold_overdue" if now >= threshold_dt else "hold_tracking"
+        elif stage == "長期追蹤":  # 滿 3 個月+1 天，用真的日曆月份算
+            age_unit = "天"
+            if entered_dt is None:
+                age, status = None, "unknown"
+            else:
+                age = calendar_days_between(entered_dt, now)
+                threshold_dt = add_months(entered_dt, LONG_TERM_MONTHS) + timedelta(days=1)
+                status = "longterm_overdue" if now >= threshold_dt else "longterm_tracking"
+        else:  # 本月確認付款：不看進入階段多久，看今天是不是本月最後一個工作天
+            age = calendar_days_between(entered_dt, now) if entered_dt else None
+            age_unit = "天"
+            if age is None:
+                status = "unknown"
+            else:
+                status = "payment_due" if is_last_workday_of_month(now) else "payment_tracking"
 
         records.append({
             "id": rid,
@@ -525,6 +603,7 @@ def build_records(token, rows, cache):
             "工作天數": age,
             "天數單位": age_unit,
             "狀態": status,
+            "最後活動時間": r.get("Last_Activity_Time"),
             "金額": r.get("Amount"),
             "預計成交日": r.get("Closing_Date"),
             "商品類別": r.get("product_type"),
@@ -551,6 +630,15 @@ STATUS_LABEL = {
     "endcheck": f"月底檢核（≥{OPPORTUNITY_ENDCHECK_DAY}工作天）",
     "st_tracking": "短期追蹤中",
     "st_escalate": f"短期追蹤逾期（≥{SHORT_TERM_ESCALATE_DAYS}天）",
+    "demo_tracking": "待約Demo追蹤中",
+    "demo_midcheck": f"待約Demo月中檢核（≥{DEMO_MIDCHECK_DAY}工作天）",
+    "demo_endcheck": f"待約Demo月底檢核（≥{DEMO_ENDCHECK_DAY}工作天）",
+    "hold_tracking": "保留中追蹤",
+    "hold_overdue": f"保留中逾期（滿{HOLD_MONTHS}個月+1天）",
+    "longterm_tracking": "長期追蹤中",
+    "longterm_overdue": f"長期追蹤逾期（滿{LONG_TERM_MONTHS}個月+1天）",
+    "payment_tracking": "本月確認付款追蹤中",
+    "payment_due": "本月確認付款（月底提醒）",
     "reassigned": "重分配，待聯繫客戶",
     "unknown": "天數未知",
 }
@@ -558,18 +646,32 @@ STATUS_CLASS = {
     "new": "st-new", "remind": "st-warn", "escalate": "st-danger",
     "tracking": "st-new", "midcheck": "st-warn", "endcheck": "st-danger",
     "st_tracking": "st-new", "st_escalate": "st-danger",
+    "demo_tracking": "st-new", "demo_midcheck": "st-warn", "demo_endcheck": "st-danger",
+    "hold_tracking": "st-new", "hold_overdue": "st-danger",
+    "longterm_tracking": "st-new", "longterm_overdue": "st-danger",
+    "payment_tracking": "st-new", "payment_due": "st-danger",
     "reassigned": "st-danger",
     "unknown": "st-unknown",
 }
 # 卡片排序用的緊急程度：數字越小越緊急，排最前面。同一層再依工作天數從多到少排。
 STATUS_PRIORITY = {
     "escalate": 0, "endcheck": 0, "st_escalate": 0, "reassigned": 0,
-    "remind": 1, "midcheck": 1,
+    "demo_endcheck": 0, "hold_overdue": 0, "longterm_overdue": 0, "payment_due": 0,
+    "remind": 1, "midcheck": 1, "demo_midcheck": 1,
     "new": 2, "tracking": 2, "st_tracking": 2,
+    "demo_tracking": 2, "hold_tracking": 2, "longterm_tracking": 2, "payment_tracking": 2,
     "unknown": 3,
 }
 # 需要優先處理／會觸發自動 Gmail 草稿的狀態，集中在這裡管理，避免各處各寫一份漏掉新狀態。
-URGENT_STATUSES = ("escalate", "endcheck", "st_escalate")
+URGENT_STATUSES = (
+    "escalate", "endcheck", "st_escalate",
+    "demo_endcheck", "hold_overdue", "longterm_overdue", "payment_due",
+)
+# 這幾個狀態的重複提醒要看 Last_Activity_Time（見 run_auto_notify）：業務上次提醒後如果
+# 有動作過（例如加備註，沒換階段），3 個工作天倒數從那個動作時間重新起算。
+# 公司名單可轉派、本月確認付款不在這裡面：公司名單本來就有轉派機制不需要這層緩衝，
+# 本月確認付款是每月固定一次提醒，跟「重複提醒」邏輯無關。
+ACTIVITY_AWARE_REMIND_STATUSES = ("st_escalate", "demo_endcheck", "hold_overdue", "longterm_overdue")
 # 報表統計數字用的階段名稱，直接對應 Zoho 裡真實的「重分配」Stage（見 REASSIGN_STAGE_NAME）。
 REASSIGNED_STAGE_LABEL = REASSIGN_STAGE_NAME
 
@@ -973,9 +1075,9 @@ def render_html(records, generated_at):
 <body>
 <div class="hero">
   <div class="eyebrow">CYBERBIZ Sales Ops · 自動化追蹤</div>
-  <h1>公司名單 / 本月有機會 / 短期追蹤 階段追蹤</h1>
-  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期｜重分配：Zoho 裡 Stage 已被主管改成「重分配」、{(_backfill_range_label() + "（全量回補模式）") if REASSIGN_FULL_BACKFILL else f"最近 {REASSIGN_LOOKBACK_DAYS} 天內"}待新業務聯繫的交易（獨立分類，不算進其他階段數字裡）</div>
-  <div class="stat-line">共 {len(records)} 筆需優先處理（公司名單 {stage_counter.get("公司名單",0)} 筆、本月有機會 {stage_counter.get("本月有機會",0)} 筆、短期追蹤 {stage_counter.get("短期追蹤",0)} 筆、重分配 {stage_counter.get(REASSIGNED_STAGE_LABEL,0)} 筆）｜每日自動更新，最後更新：{generated_at}</div>
+  <h1>交易階段追蹤</h1>
+  <div class="range">只列出 ROSTER 名單裡的業務（一課～四課＋POS＋Ambrose），且只列出已經超過門檻、需優先處理的交易（正常天數的不顯示）｜上方可依課別篩選，點欄位標題可排序｜公司名單：超過 {COMPANY_LIST_ESCALATE_DAY} 個工作天可轉派｜本月有機會：超過 {OPPORTUNITY_ENDCHECK_DAY} 個工作天月底檢核逾期｜短期追蹤：超過 {SHORT_TERM_ESCALATE_DAYS} 天逾期｜待約Demo：超過 {DEMO_ENDCHECK_DAY} 個工作天月底檢核逾期｜保留中：滿 {HOLD_MONTHS} 個月+1天逾期｜長期追蹤：滿 {LONG_TERM_MONTHS} 個月+1天逾期｜本月確認付款：每月最後一個工作天固定提醒｜重分配：Zoho 裡 Stage 已被主管改成「重分配」、{(_backfill_range_label() + "（全量回補模式）") if REASSIGN_FULL_BACKFILL else f"最近 {REASSIGN_LOOKBACK_DAYS} 天內"}待新業務聯繫的交易（獨立分類，不算進其他階段數字裡）</div>
+  <div class="stat-line">共 {len(records)} 筆需優先處理（公司名單 {stage_counter.get("公司名單",0)}、本月有機會 {stage_counter.get("本月有機會",0)}、短期追蹤 {stage_counter.get("短期追蹤",0)}、待約Demo {stage_counter.get("待約Demo",0)}、保留中 {stage_counter.get("保留中",0)}、長期追蹤 {stage_counter.get("長期追蹤",0)}、本月確認付款 {stage_counter.get("本月確認付款",0)}、重分配 {stage_counter.get(REASSIGNED_STAGE_LABEL,0)}）｜每日自動更新，最後更新：{generated_at}</div>
 </div>
 <div class="sticky-panel">
   <div class="stat-grid">
@@ -983,6 +1085,10 @@ def render_html(records, generated_at):
     <div class="stat-box"><div class="num">{stage_counter.get("公司名單",0)}</div><div class="lbl">公司名單可轉派</div></div>
     <div class="stat-box"><div class="num">{stage_counter.get("本月有機會",0)}</div><div class="lbl">本月有機會月底逾期</div></div>
     <div class="stat-box"><div class="num">{stage_counter.get("短期追蹤",0)}</div><div class="lbl">短期追蹤逾期</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get("待約Demo",0)}</div><div class="lbl">待約Demo月底逾期</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get("保留中",0)}</div><div class="lbl">保留中逾期</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get("長期追蹤",0)}</div><div class="lbl">長期追蹤逾期</div></div>
+    <div class="stat-box"><div class="num">{stage_counter.get("本月確認付款",0)}</div><div class="lbl">本月確認付款提醒</div></div>
     <div class="stat-box"><div class="num">{stage_counter.get(REASSIGNED_STAGE_LABEL,0)}</div><div class="lbl">重分配待聯繫</div></div>
   </div>
   <div class="notify-toolbar">
@@ -1074,14 +1180,14 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
 
 
 def _build_deals_table_html(deals):
-    """把一份交易清單組成統一格式的表格（交易名稱／階段／天數／規則），依天數多到少排序。"""
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
     w1, w2, w3, w4 = _TABLE_COL_WIDTHS
     deals_sorted = sorted(
         deals,
@@ -1108,7 +1214,7 @@ def _build_deals_table_html(deals):
       <tr style="background:#f7f2e8;">
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
       </tr>
     </thead>
@@ -1124,7 +1230,11 @@ _RULE_REMINDER_HTML = '''
     小提醒，名單判斷規則：<br>
     ・公司名單：進來後 3 天內要完成聯繫並調整階段<br>
     ・本月有機會：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核並調整階段<br>
-    ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段
+    ・短期追蹤：3 個月（90 天）內要完成成交或轉換階段<br>
+    ・待約Demo：第 11 個工作天會月中檢核，第 22 個工作天會月底檢核並調整階段<br>
+    ・保留中：滿 6 個月+1 天要重新確認狀態<br>
+    ・長期追蹤：滿 3 個月+1 天要重新確認狀態<br>
+    ・本月確認付款：每個月最後一個工作天會提醒確認當月是否付款
   </p>'''
 
 
@@ -1142,7 +1252,7 @@ def _reassign_period_phrase():
 
 
 def build_notify_html(owner_name, deals, reassigned_deals=None):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。
     reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
     跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人這次
     只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
@@ -1204,9 +1314,13 @@ def build_manager_summary_html(deals):
 
 
 def build_mime_message(to_email, subject, html_body, cc_email=None):
+    """cc_email 可以是單一 email 字串，也可以是 list（例如同時 CC 給 Ambrose 跟課長），
+    list 的話會自動用逗號接起來變成一個 Cc 表頭。"""
     msg = EmailMessage()
     msg["To"] = to_email
     if cc_email:
+        if isinstance(cc_email, (list, tuple, set)):
+            cc_email = ", ".join(sorted(set(cc_email)))
         msg["Cc"] = cc_email
     msg["Subject"] = subject
     msg.set_content("這封信包含 HTML 格式，請用支援 HTML 的信箱檢視。")
@@ -1243,7 +1357,8 @@ def send_gmail_message(token, msg):
     return resp.json()
 
 
-def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_REPEAT_WORKDAYS, count_workdays=True):
+def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_REPEAT_WORKDAYS,
+                          count_workdays=True, last_activity_at=None):
     """
     判斷這筆交易現在要不要（再）建立一封提醒草稿。
     - 之前從沒建過草稿：要建。
@@ -1253,6 +1368,11 @@ def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_R
     預設是業務個人提醒信用的 URGENT_REMIND_REPEAT_WORKDAYS（3 個工作天，count_workdays=True）；
     主管彙整信另外傳 repeat_days=MANAGER_SUMMARY_REMIND_REPEAT_DAYS、count_workdays=False
     （2 天，用日曆天算，間隔比較短）。
+
+    last_activity_at（選填，目前只有短期追蹤會傳）：如果業務在上次提醒之後有任何異動
+    （例如加備註，但沒有換階段），代表他有在處理、不是完全沒動靜，這時候「距離上次動作」
+    改成從這個異動時間重新起算，而不是從上次提醒時間起算——等於業務一有動作，3 個工作天
+    的倒數就會重新開始；完全沒動靜的才會照原本的時間點滿 3 個工作天就再提醒。
     """
     if not entry:
         return True
@@ -1267,6 +1387,10 @@ def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_R
         return True
     if last_dt.tzinfo is None:
         last_dt = last_dt.replace(tzinfo=TAIPEI_TZ)
+    if last_activity_at:
+        activity_dt = parse_zoho_dt(last_activity_at)
+        if activity_dt and activity_dt > last_dt:
+            last_dt = activity_dt  # 業務上次提醒後有動作過，倒數改從這個時間點重新算
     if count_workdays:
         days_since = workdays_between(last_dt, now)
         return (days_since or 0) >= repeat_days
@@ -1300,9 +1424,13 @@ def run_auto_notify(records, reassigned):
         if r["狀態"] not in URGENT_STATUSES:
             continue
         entry = log.get(r["id"])
-        # 公司名單可轉派／本月有機會月底檢核／短期追蹤逾期，統一 3 個工作天沒處理就再提醒一次
+        # 公司名單可轉派／本月有機會月底檢核／短期追蹤逾期等，統一 3 個工作天沒處理就再提醒一次
         # （公司名單原本是 7 天，現在因為會同步 CC 給 Ambrose，改成跟另外兩個一致）。
-        if not should_send_reminder(entry, r["狀態"], now):
+        # 短期追蹤、待約Demo月底檢核、保留中逾期、長期追蹤逾期這四個額外看 Last_Activity_Time：
+        # 業務如果在上次提醒後有動作過（例如加備註，但沒換階段），3 個工作天倒數會從那個
+        # 動作時間重新起算；完全沒動靜的才會照原本時間點滿 3 個工作天就再提醒。
+        last_activity_at = r.get("最後活動時間") if r["狀態"] in ACTIVITY_AWARE_REMIND_STATUSES else None
+        if not should_send_reminder(entry, r["狀態"], now, last_activity_at=last_activity_at):
             continue  # 狀態沒變，而且還沒到重複提醒的天數，不用再寄
         by_owner[(r["業務Email"], r["業務"])].append(r)
 
@@ -1346,7 +1474,17 @@ def run_auto_notify(records, reassigned):
         html_body = build_notify_html(owner_name, deals, reassigned_deals)
         to_email = NOTIFY_TEST_EMAIL or owner_email
         # 每封業務個人提醒信都 CC 給 Ambrose，讓他同步掌握進度；測試模式不 CC，避免手動測試時真的通知到他。
-        cc_email = None if NOTIFY_TEST_EMAIL else MANAGER_SUMMARY_EMAIL
+        # 業務二課、業務三課另外還要 CC 給課長（見 TEAM_EXTRA_CC），但課長收到自己的提醒信時
+        # 不會再 CC 自己一次，只 CC Ambrose，避免多此一舉。
+        if NOTIFY_TEST_EMAIL:
+            cc_email = None
+        else:
+            cc_list = [MANAGER_SUMMARY_EMAIL]
+            owner_team = (deals[0] if deals else reassigned_deals[0])["業務課"] if (deals or reassigned_deals) else None
+            extra_cc = TEAM_EXTRA_CC.get(owner_team)
+            if extra_cc and extra_cc != owner_email:
+                cc_list.append(extra_cc)
+            cc_email = cc_list
         msg = build_mime_message(to_email, subject, html_body, cc_email=cc_email)
         try:
             result = create_gmail_draft(token, msg)  # 測試階段先建草稿，確認沒問題後改回 send_gmail_message
