@@ -672,6 +672,16 @@ URGENT_STATUSES = (
 # 公司名單可轉派、本月確認付款不在這裡面：公司名單本來就有轉派機制不需要這層緩衝，
 # 本月確認付款是每月固定一次提醒，跟「重複提醒」邏輯無關。
 ACTIVITY_AWARE_REMIND_STATUSES = ("st_escalate", "demo_endcheck", "hold_overdue", "longterm_overdue")
+# 待約Demo/保留中/長期追蹤是 2026-08-12 才第一次正式寄出的新階段，很多交易在這天之前
+# 其實業務早就有在動（加備註之類的），只是系統今天才第一次追蹤、沒有歷史比對基準。
+# 所以「上線日當天寄出的第一次提醒」，3 個工作天後的第一輪重複提醒改成往回看
+# NEW_STAGES_FIRST_ROUND_LOOKBACK_DAYS 天內有沒有任何 Last Activity（而不是只比對
+# 「有沒有晚於上線日那次提醒」），避免誤判成業務都沒在處理。從第二輪重複提醒開始，
+# 就恢復成正常的「只比對上次提醒之後有沒有活動」邏輯。st_escalate（短期追蹤）不是新階段，
+# 不套用這個上線緩衝，一律用正常邏輯。
+NEW_STAGES_ROLLOUT_DATE = "2026-08-12"
+NEW_STAGES_FIRST_ROUND_LOOKBACK_DAYS = 30
+NEW_STAGE_STATUSES_WITH_ROLLOUT_GRACE = ("demo_endcheck", "hold_overdue", "longterm_overdue")
 # 報表統計數字用的階段名稱，直接對應 Zoho 裡真實的「重分配」Stage（見 REASSIGN_STAGE_NAME）。
 REASSIGNED_STAGE_LABEL = REASSIGN_STAGE_NAME
 
@@ -1358,7 +1368,8 @@ def send_gmail_message(token, msg):
 
 
 def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_REPEAT_WORKDAYS,
-                          count_workdays=True, last_activity_at=None):
+                          count_workdays=True, last_activity_at=None,
+                          first_round_lookback_days=NEW_STAGES_FIRST_ROUND_LOOKBACK_DAYS):
     """
     判斷這筆交易現在要不要（再）建立一封提醒草稿。
     - 之前從沒建過草稿：要建。
@@ -1369,10 +1380,18 @@ def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_R
     主管彙整信另外傳 repeat_days=MANAGER_SUMMARY_REMIND_REPEAT_DAYS、count_workdays=False
     （2 天，用日曆天算，間隔比較短）。
 
-    last_activity_at（選填，目前只有短期追蹤會傳）：如果業務在上次提醒之後有任何異動
-    （例如加備註，但沒有換階段），代表他有在處理、不是完全沒動靜，這時候「距離上次動作」
-    改成從這個異動時間重新起算，而不是從上次提醒時間起算——等於業務一有動作，3 個工作天
-    的倒數就會重新開始；完全沒動靜的才會照原本的時間點滿 3 個工作天就再提醒。
+    last_activity_at（選填）：如果業務在上次提醒之後有任何異動（例如加備註，但沒有換階段），
+    代表他有在處理、不是完全沒動靜，這時候「距離上次動作」改成從這個異動時間重新起算，
+    而不是從上次提醒時間起算——等於業務一有動作，3 個工作天的倒數就會重新開始；
+    完全沒動靜的才會照原本的時間點滿 3 個工作天就再提醒。
+
+    是不是「新階段上線當天的第一次提醒」，用 drafted_at 的日期是不是等於
+    NEW_STAGES_ROLLOUT_DATE、加上狀態有沒有落在 NEW_STAGE_STATUSES_WITH_ROLLOUT_GRACE
+    來直接判斷（不再依賴 log 裡另外存一個 first_round 欄位）——這樣不管上線當天寄出
+    那一次是用哪個版本的程式跑的，只要 log 記到的 drafted_at 日期對得上，下一輪重複
+    提醒還是能正確套用「往回推 first_round_lookback_days 天內有沒有任何 Last Activity」
+    這條規則，而不是跟「上線日那次提醒時間」比——因為上線日那次提醒本身沒有歷史比對
+    基準，用它當基準不可靠。下一輪（drafted_at 不是上線日）就會自動恢復正常邏輯。
     """
     if not entry:
         return True
@@ -1387,6 +1406,18 @@ def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_R
         return True
     if last_dt.tzinfo is None:
         last_dt = last_dt.replace(tzinfo=TAIPEI_TZ)
+
+    is_first_round = (
+        current_status in NEW_STAGE_STATUSES_WITH_ROLLOUT_GRACE
+        and last_dt.strftime("%Y-%m-%d") == NEW_STAGES_ROLLOUT_DATE
+    )
+    if is_first_round:
+        if last_activity_at:
+            activity_dt = parse_zoho_dt(last_activity_at)
+            if activity_dt and (now - activity_dt).days < first_round_lookback_days:
+                return False  # 最近一個月內有活動紀錄，先不提醒
+        return True  # 沒有活動紀錄，或活動已經超過一個月沒動，該提醒了
+
     if last_activity_at:
         activity_dt = parse_zoho_dt(last_activity_at)
         if activity_dt and activity_dt > last_dt:
@@ -1495,7 +1526,12 @@ def run_auto_notify(records, reassigned):
         if NOTIFY_TEST_EMAIL:
             continue  # 測試模式不寫入紀錄檔，避免正式排程誤以為這筆已經通知過而漏寄
         for d in deals:
-            log[d["id"]] = {"status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id")}
+            # 是不是「新階段上線當天的第一次提醒」不用在這裡標記，should_send_reminder
+            # 會直接用這筆 drafted_at 的日期去跟 NEW_STAGES_ROLLOUT_DATE 比對，
+            # 所以不管這次寄送是用哪個版本的程式跑的，下一輪重複提醒都能正確套用規則。
+            log[d["id"]] = {
+                "status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id"),
+            }
 
     save_draft_log(log)
     print(f"本次共建立 {sent} 封提醒信草稿（測試階段，尚未改成直接寄出）。")
