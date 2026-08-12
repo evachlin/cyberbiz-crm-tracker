@@ -106,7 +106,6 @@ ROSTER = {
     "ryder.wu@cyberbiz.io": ("Ryder Wu", "業務一課"),
     "sarah.lin@cyberbiz.io": ("Sarah Lin", "業務一課"),
     "eason.hsiao@cyberbiz.io": ("Eason Hsiao", "業務二課"),
-    "justin.tsao@cyberbiz.io": ("Justin Tsao", "業務二課"),
     "josh.wu@cyberbiz.io": ("Josh Wu", "業務二課"),
     "steven.lin@cyberbiz.io": ("Steven Lin", "業務二課"),
     "andy.zhuang@cyberbiz.io": ("Andy Zhuang", "業務二課"),
@@ -1190,14 +1189,14 @@ def save_draft_log(log):
 
 
 # 業務個人提醒信、主管彙整信共用同一份表格欄寬設定，這樣不管哪封信、哪個人的表格，
-# 欄位對齊都會一致（交易名稱／階段／幾天／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
+# 欄位對齊都會一致（交易名稱／階段／天數／規則）。用固定像素寬度，不用撐滿整個頁面寬度，
 # 只要夠寬看得到完整文字即可；交易名稱欄位允許換行，避免長名稱被截斷看不到。
 _TABLE_COL_WIDTHS = ("300px", "90px", "80px", "170px")
 _TABLE_TOTAL_WIDTH = "640px"
 
 
 def _build_deals_table_html(deals):
-    """把一份交易清單組成統一格式的表格（交易名稱／階段／幾天／規則），依天數多到少排序。"""
+    """把一份交易清單組成統一格式的表格（交易名稱／階段／天數／規則），依天數多到少排序。"""
     w1, w2, w3, w4 = _TABLE_COL_WIDTHS
     deals_sorted = sorted(
         deals,
@@ -1224,7 +1223,7 @@ def _build_deals_table_html(deals):
       <tr style="background:#f7f2e8;">
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">交易名稱</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">階段</th>
-        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">幾天</th>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">天數</th>
         <th style="text-align:left;padding:6px 10px;border-bottom:2px solid #dfd0ba;">規則</th>
       </tr>
     </thead>
@@ -1262,7 +1261,7 @@ def _reassign_period_phrase():
 
 
 def build_notify_html(owner_name, deals, reassigned_deals=None):
-    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／幾天／規則），依天數多到少排序。
+    """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。
     reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
     跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人這次
     只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
