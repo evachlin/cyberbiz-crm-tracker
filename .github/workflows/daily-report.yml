@@ -6,7 +6,7 @@ on:
     # 故意不用整點（00:00），因為全世界一堆 repo 都排在整點觸發，GitHub 那邊會塞車，
     # 常常延遲很久才真的執行；分鐘數錯開一點可以大幅降低塞車機率。
     # 要改成別的時間，把下面這行的 "17 0" 換成 "分鐘 (小時-8)"，例如台北 09:30 就寫 "30 1"。
-    - cron: "0 22 * * *"
+    - cron: "17 0 * * *"
   workflow_dispatch:      # 允許在 GitHub 網頁上手動按「Run workflow」立即跑一次，方便測試
     inputs:
       test_mode:
@@ -18,6 +18,13 @@ on:
         default: "true"
       reassign_full_backfill:
         description: "重分配全量回補：選 true 的話這次不受最近 3 天限制，會把 2026/1/1 至今所有還在「重分配」階段、還沒被通知過的交易一次補寄出去。只有第一次上線要清歷史積壓時才選 true，補完之後下次 Run workflow 記得改回 false，平常的排程也一律是 false。"
+        type: choice
+        options:
+          - "false"
+          - "true"
+        default: "false"
+      owner_change_backfill:
+        description: "舊交易換Owner回補：選 true 的話會逐一檢查建立時間在2026/1/1前、但目前還卡在追蹤階段的舊交易，只有真的在2026/1/1後換過Owner的才會補進追蹤（其他當初只是被系統批次動過的舊資料不會)。候選量可能有幾千筆，會逐筆呼叫Timeline API，跑很久。只有第一次上線要清歷史積壓時才選true，跑完記得改回false，平常排程一律是false。"
         type: choice
         options:
           - "false"
@@ -58,6 +65,8 @@ jobs:
           NOTIFY_TEST_EMAIL: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.test_mode == 'true') && 'eva.ch.lin@cyberbiz.io' || '' }}
           # 只有手動 Run workflow、而且這欄選 true 時才會生效，正式排程一律是 false（只看最近幾天）。
           REASSIGN_FULL_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reassign_full_backfill == 'true' }}
+          # 只有手動 Run workflow、而且這欄選 true 時才會生效，正式排程一律是 false。
+          OWNER_CHANGE_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.owner_change_backfill == 'true' }}
         run: python scripts/generate_report.py
 
       - name: Commit updated report
