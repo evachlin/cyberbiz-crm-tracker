@@ -8259,9 +8259,9 @@
   "owner_email": "calvin.chen@cyberbiz.io"
  },
  "4164702000799654001": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-13T10:43:45+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "保留中",
+  "entered_at": "2026-08-13T11:52:53+08:00",
+  "note": null,
   "owner_email": "josh.wu@cyberbiz.io"
  },
  "4164702000799552018": {
@@ -8269,5 +8269,11 @@
   "entered_at": "2026-08-13T11:16:51+08:00",
   "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
   "owner_email": "sarah.lin@cyberbiz.io"
+ },
+ "4164702000799588003": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-13T11:53:29+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "allen.yk.chen@cyberbiz.io"
  }
 }
