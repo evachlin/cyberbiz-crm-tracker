@@ -30,6 +30,13 @@ on:
           - "false"
           - "true"
         default: "false"
+      dormant_backfill:
+        description: "舊名單一次性盤點：選 true 的話會抓出建立時間在2026/1/1前、之後完全沒有任何異動的舊交易（跟owner_change_backfill互補，那邊抓的是有異動過的），併入業務個人提醒信裡獨立一段，請業務盤點是否還有效。不進網頁報表，只出現在信件裡。只有第一次要清歷史積壓時才選true，跑完記得改回false，平常排程一律是false。"
+        type: choice
+        options:
+          - "false"
+          - "true"
+        default: "false"
 
 permissions:
   contents: write
@@ -67,6 +74,8 @@ jobs:
           REASSIGN_FULL_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reassign_full_backfill == 'true' }}
           # 只有手動 Run workflow、而且這欄選 true 時才會生效，正式排程一律是 false。
           OWNER_CHANGE_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.owner_change_backfill == 'true' }}
+          # 只有手動 Run workflow、而且這欄選 true 時才會生效，正式排程一律是 false。
+          DORMANT_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dormant_backfill == 'true' }}
         run: python scripts/generate_report.py
 
       - name: Commit updated report
