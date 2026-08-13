@@ -97,6 +97,18 @@ REASSIGN_LOOKBACK_DAYS = 3
 # 一次抓出來通知。第一次上線清歷史積壓用一次就好，平常的排程一律是 false。
 REASSIGN_FULL_BACKFILL = (os.environ.get("REASSIGN_FULL_BACKFILL") or "").lower() == "true"
 
+# 只有手動 Run workflow、且這個環境變數選 true 時才會生效（見 daily-report.yml 的
+# owner_change_backfill 選項）：一次性回補「建立時間在 TRACK_SINCE（2026/1/1）之前、
+# 但 Owner 在那之後真的換過人」的舊交易——例如舊業務離職或調整分工，交易直接被改 Owner，
+# 但 Stage 沒變、也沒經過「重分配」這個 Stage，平常的 Created_Time 過濾會把這種交易完全
+# 排除在追蹤範圍外。這裡先用 Created_Time < TRACK_SINCE AND Modified_Time >= TRACK_SINCE
+# 粗篩一輪候選名單（COQL 一次帶 3 個 AND 條件會噴 SYNTAX_ERROR，所以粗篩只用 2 個條件查，
+# Modified_Time 留到 Python 這邊篩），真正「是不是真的換過 Owner」還是交給 build_records
+# 逐筆查 Timeline 確認——確認沒有的話 entered_dt 會早於 TRACK_SINCE，會被自動排除，
+# 不會把幾千筆早就沒人管的死名單一次灌進報表。第一次上線清歷史積壓用一次就好，
+# 平常的排程一律是 false。
+OWNER_CHANGE_BACKFILL = (os.environ.get("OWNER_CHANGE_BACKFILL") or "").lower() == "true"
+
 # ---------------------------------------------------------------------------
 # 業務課對照表：跟 Zoho 裡的 Owner email 對應。人員異動時只要改這裡。
 # ---------------------------------------------------------------------------
@@ -106,6 +118,7 @@ ROSTER = {
     "ryder.wu@cyberbiz.io": ("Ryder Wu", "業務一課"),
     "sarah.lin@cyberbiz.io": ("Sarah Lin", "業務一課"),
     "eason.hsiao@cyberbiz.io": ("Eason Hsiao", "業務二課"),
+    "justin.tsao@cyberbiz.io": ("Justin Tsao", "業務二課"),
     "josh.wu@cyberbiz.io": ("Josh Wu", "業務二課"),
     "steven.lin@cyberbiz.io": ("Steven Lin", "業務二課"),
     "andy.zhuang@cyberbiz.io": ("Andy Zhuang", "業務二課"),
@@ -272,24 +285,57 @@ def get_timeline(token, record_id, module="Deals", max_pages=10):
     return items
 
 
-def find_stage_entry_time(token, record_id, target_stage, created_time):
+def find_stage_entry_time(token, record_id, target_stage, owner_display_name, created_time):
     """
-    在 Timeline 裡找出「變成 target_stage 那一刻」的時間。
-    找不到（例如一開始建立就是這個階段）就回退用 Created_Time。
+    在 Timeline 裡找出「變成 target_stage 那一刻」的時間，同時也找「換成目前這位業務」的時間，
+    取兩者比較晚的一個當作年齡起算點。
+
+    背景：交易可能在 Stage 沒變的情況下直接被改 Owner（不是走「重分配」那個 Stage），
+    這種情況如果只看 Stage 進入時間，會沿用原本業務進入這個階段的舊時間繼續算，
+    對剛接手的新業務不公平（他昨天才拿到，年齡卻顯示已經超過門檻）。所以只要 Timeline
+    裡找得到「換成目前這位業務」的紀錄、而且比 Stage 進入時間晚，就改用換人的時間起算。
+
+    找不到 Stage 進入紀錄（例如一開始建立就是這個階段，或超出 Timeline 追蹤範圍）就回退用
+    Created_Time。找不到 Owner 換人紀錄，代表這個人從一開始就是 Owner，沒有中途換過人，
+    不用調整。
     """
     try:
         timeline = get_timeline(token, record_id)
     except requests.HTTPError:
         return created_time, "無法讀取階段歷史，暫以建立時間估算"
+
+    stage_entered_at = None
+    owner_changed_at = None
+    owner_key = (owner_display_name or "").strip().lower()
     for item in timeline:
         # 有些 timeline 事件（例如新增 Task/Note）field_history 這個鍵存在但值是 null，
         # 不是缺少這個鍵，用 .get(key, []) 接不住 None，要用 "or []" 才保險。
         for change in item.get("field_history") or []:
-            if change.get("api_name") == "Stage":
-                new_val = (change.get("_value") or {}).get("new")
-                if new_val == target_stage:
-                    return item.get("audited_time"), None
-    return created_time, "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算"
+            api_name = change.get("api_name")
+            new_val = (change.get("_value") or {}).get("new")
+            if api_name == "Stage" and stage_entered_at is None and new_val == target_stage:
+                stage_entered_at = item.get("audited_time")
+            elif (
+                api_name == "Owner"
+                and owner_changed_at is None
+                and owner_key
+                and (new_val or "").strip().lower() == owner_key
+            ):
+                owner_changed_at = item.get("audited_time")
+        if stage_entered_at and owner_changed_at:
+            break  # timeline 是新到舊排序，兩個都找到了就不用再往下翻
+
+    if stage_entered_at is None:
+        base_at = created_time
+        note = "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算"
+    else:
+        base_at = stage_entered_at
+        note = None
+
+    if owner_changed_at and parse_zoho_dt(owner_changed_at) > parse_zoho_dt(base_at):
+        return owner_changed_at, None  # 換過業務，改以最新接手時間起算（這是精確時間，可信任快取）
+
+    return base_at, note
 
 
 # ---------------------------------------------------------------------------
@@ -481,8 +527,39 @@ def fetch_current_deals(token):
     return rows
 
 
+def fetch_owner_change_backfill_candidates(token):
+    """
+    只有 OWNER_CHANGE_BACKFILL=true 時才會呼叫。逐個追蹤階段查「建立時間在 TRACK_SINCE
+    之前、目前還卡在這個階段」的交易（COQL 不能一次帶 Stage/Created_Time/Modified_Time
+    三個 AND 條件，所以只查 Stage + Created_Time 兩個，Modified_Time 粗篩留到這裡用
+    Python 判斷），先過濾出「TRACK_SINCE 之後有異動過」的候選名單。
+
+    這裡抓到的只是候選名單，不代表真的換過 Owner——後面 build_records 會逐筆查 Timeline
+    才能確定，沒有真的換過 Owner 的會被自動排除（entered_dt 早於 TRACK_SINCE）。
+    """
+    track_since_dt = parse_zoho_dt(TRACK_SINCE)
+    all_rows = []
+    for stage in STAGES_TRACKED:
+        query = (
+            "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, "
+            "Stage, Created_Time, Modified_Time, Last_Activity_Time, Amount, Closing_Date, "
+            "product_type, visitor_source "
+            f"FROM Deals WHERE (Stage = '{stage}') AND (Created_Time < '{TRACK_SINCE}') "
+            "ORDER BY Modified_Time DESC"
+        )
+        rows = coql_query(token, query)
+        for r in rows:
+            modified_dt = parse_zoho_dt(r.get("Modified_Time"))
+            if modified_dt and modified_dt >= track_since_dt:
+                all_rows.append(r)
+    if ROSTER_ONLY_FILTER:
+        all_rows = [r for r in all_rows if r.get("Owner.email") in ROSTER]
+    return all_rows
+
+
 def build_records(token, rows, cache):
     now = datetime.now(TAIPEI_TZ)
+    track_since_dt = parse_zoho_dt(TRACK_SINCE)
     new_cache = dict(cache)  # 先繼承舊快取，中途存檔時舊資料不會不見
     records = []
     api_calls_made = 0
@@ -495,23 +572,32 @@ def build_records(token, rows, cache):
         rid = r["id"]
         stage = r["Stage"]
         cached = cache.get(rid)
+        owner_email = r.get("Owner.email") or ""
+        owner_display_name = f"{(r.get('Owner.first_name') or '').strip()} {(r.get('Owner.last_name') or '').strip()}".strip()
 
-        # 只有「乾淨命中 Timeline 記錄」（note 是 None）才信任快取；
+        # 只有「乾淨命中 Timeline 記錄」（note 是 None）、而且 Owner 沒換過人，才信任快取；
         # 如果快取裡的是退回估算值（note 有內容），代表當初沒查到真正的階段變更時間，
         # 不能永久鎖死，每次都要重查，直到查到真正的 Timeline 記錄為止（自我修正）。
-        if cached and cached.get("stage") == stage and cached.get("entered_at") and cached.get("note") is None:
+        # Owner 換過人（即使 Stage 沒變）也要強制重查，因為年齡起算點要改用新業務接手的時間。
+        if (
+            cached
+            and cached.get("stage") == stage
+            and cached.get("entered_at")
+            and cached.get("note") is None
+            and cached.get("owner_email") == owner_email
+        ):
             entered_at = cached["entered_at"]
             note = cached.get("note")
         else:
             created_time = r.get("Created_Time")
             try:
-                entered_at, note = find_stage_entry_time(token, rid, stage, created_time)
+                entered_at, note = find_stage_entry_time(token, rid, stage, owner_display_name, created_time)
             except requests.exceptions.RequestException as e:
                 # 單筆網路問題不要讓整個程式停掉，退回用建立時間，下次執行會再重試這一筆
                 entered_at, note = created_time, f"查 Timeline 時發生網路問題（{e.__class__.__name__}），暫以建立時間估算"
             api_calls_made += 1
 
-        new_cache[rid] = {"stage": stage, "entered_at": entered_at, "note": note}
+        new_cache[rid] = {"stage": stage, "entered_at": entered_at, "note": note, "owner_email": owner_email}
 
         # 每處理 20 筆，或每呼叫 20 次 API，就先把目前的快取存檔一次。
         # 這樣如果這次執行中途被取消或失敗，下次重跑不會從零開始，只需要接著處理剩下的。
@@ -521,6 +607,14 @@ def build_records(token, rows, cache):
             print(f"進度 {idx}/{total}（本次已呼叫 Timeline API {api_calls_made} 次，已耗時 {elapsed:.0f} 秒）", flush=True)
 
         entered_dt = parse_zoho_dt(entered_at)
+
+        # 安全閥：entered_dt 一定要落在 TRACK_SINCE（2026/1/1）之後才算數。正常每日流程
+        # 撈到的候選交易本來就一定滿足這個條件（Created_Time 篩選就保證了），這裡主要是
+        # 擋掉 OWNER_CHANGE_BACKFILL 撈進來、但查完 Timeline 後發現其實沒有真的換過 Owner
+        # 也沒有重新進過這個階段的舊交易——它們的 entered_dt 還是很久以前，直接跳過，
+        # 不進報表、也不會觸發提醒信，避免把大量早就沒人管的死名單灌進來。
+        if entered_dt is None or entered_dt < track_since_dt:
+            continue
 
         name, team = resolve_owner(r.get("Owner.email"), r.get("Owner.first_name"), r.get("Owner.last_name"))
 
@@ -1587,6 +1681,16 @@ def run_manager_summary(records):
 def main():
     token = get_access_token()
     rows = fetch_current_deals(token)
+
+    if OWNER_CHANGE_BACKFILL:
+        backfill_rows = fetch_owner_change_backfill_candidates(token)
+        print(
+            f"⚠️ 舊交易換Owner回補模式開啟：找到 {len(backfill_rows)} 筆候選"
+            f"（建立於 {TRACK_SINCE} 前、但之後有異動過），逐筆查 Timeline 確認是否真的換過業務，"
+            f"這一輪會花比平常久，沒有真的換過人的會被自動排除，不會進報表。"
+        )
+        rows = rows + backfill_rows
+
     cache = load_cache()
     records, new_cache, api_calls = build_records(token, rows, cache)
     save_cache(new_cache)
