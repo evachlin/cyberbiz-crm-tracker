@@ -109,6 +109,16 @@ REASSIGN_FULL_BACKFILL = (os.environ.get("REASSIGN_FULL_BACKFILL") or "").lower(
 # 平常的排程一律是 false。
 OWNER_CHANGE_BACKFILL = (os.environ.get("OWNER_CHANGE_BACKFILL") or "").lower() == "true"
 
+# 只有手動 Run workflow、且這個環境變數選 true 時才會生效（見 daily-report.yml 的
+# dormant_backfill 選項）：一次性抓出「從 TRACK_SINCE（2026/1/1）之前就完全沒有任何
+# 異動」的舊交易——用 Modified_Time < TRACK_SINCE 判斷，這個條件本身就保證 Created_Time
+# 也早於 TRACK_SINCE（Modified_Time 一定 >= Created_Time），不需要像 OWNER_CHANGE_BACKFILL
+# 那樣還要逐筆查 Timeline 確認，沒異動就是沒異動。跟 OWNER_CHANGE_BACKFILL 是互補的兩批：
+# 一個是「有真的換過人／重新進過階段」，一個是「完全沒人碰過」。只限 ROSTER 名單裡的人，
+# 通知業務盤點這些長期沒處理的舊名單是不是還有效。第一次上線清歷史積壓用一次就好，
+# 平常的排程一律是 false。
+DORMANT_BACKFILL = (os.environ.get("DORMANT_BACKFILL") or "").lower() == "true"
+
 # ---------------------------------------------------------------------------
 # 業務課對照表：跟 Zoho 裡的 Owner email 對應。人員異動時只要改這裡。
 # ---------------------------------------------------------------------------
@@ -557,6 +567,54 @@ def fetch_owner_change_backfill_candidates(token):
     return all_rows
 
 
+def fetch_dormant_backfill_candidates(token):
+    """
+    只有 DORMANT_BACKFILL=true 時才會呼叫。逐個追蹤階段查「Modified_Time 早於 TRACK_SINCE」
+    的交易——因為 Modified_Time 一定 >= Created_Time，這個條件本身就保證 Created_Time 也
+    早於 TRACK_SINCE，不用像 OWNER_CHANGE_BACKFILL 那樣還要查 Timeline 確認，這批就是
+    「從建立之後真的完全沒人動過」的舊交易。
+    """
+    all_rows = []
+    for stage in STAGES_TRACKED:
+        query = (
+            "SELECT id, Deal_Name, Owner.first_name, Owner.last_name, Owner.email, "
+            "Stage, Created_Time, Modified_Time, Last_Activity_Time, Amount, Closing_Date, "
+            "product_type, visitor_source "
+            f"FROM Deals WHERE (Stage = '{stage}') AND (Modified_Time < '{TRACK_SINCE}') "
+            "ORDER BY Modified_Time ASC"
+        )
+        rows = coql_query(token, query)
+        all_rows.extend(rows)
+    if ROSTER_ONLY_FILTER:
+        all_rows = [r for r in all_rows if r.get("Owner.email") in ROSTER]
+    return all_rows
+
+
+def build_dormant_records(rows):
+    """
+    把 fetch_dormant_backfill_candidates() 撈到的候選組成報表/信件用的紀錄格式。
+    「幾天」用 Modified_Time 到今天算（也就是建立之後最後一次有任何異動的時間，這批
+    交易的 Modified_Time 就約略等於 Created_Time，因為從沒被動過）。狀態統一標成
+    "dormant"，跟正常的階段規則狀態分開，不套用原本的工作天數門檻判斷。
+    """
+    now = datetime.now(TAIPEI_TZ)
+    records = []
+    for r in rows:
+        name, team = resolve_owner(r.get("Owner.email"), r.get("Owner.first_name"), r.get("Owner.last_name"))
+        modified_dt = parse_zoho_dt(r.get("Modified_Time"))
+        age = calendar_days_between(modified_dt, now) if modified_dt else None
+        records.append({
+            "id": r["id"], "交易名稱": r.get("Deal_Name"), "業務": name,
+            "業務Email": r.get("Owner.email") or "", "業務課": team, "Stage": r.get("Stage"),
+            "進入此階段時間": r.get("Modified_Time"),
+            "進入時間備註": "以最後異動時間（Modified_Time）估算，代表建立後從未異動過",
+            "工作天數": age, "天數單位": "天", "狀態": "dormant",
+            "金額": r.get("Amount"), "預計成交日": r.get("Closing_Date"),
+            "商品類別": r.get("product_type"), "名單來源": r.get("visitor_source"),
+        })
+    return records
+
+
 def build_records(token, rows, cache):
     now = datetime.now(TAIPEI_TZ)
     track_since_dt = parse_zoho_dt(TRACK_SINCE)
@@ -733,6 +791,7 @@ STATUS_LABEL = {
     "payment_tracking": "本月確認付款追蹤中",
     "payment_due": "本月確認付款（月底提醒）",
     "reassigned": "重分配，待聯繫客戶",
+    "dormant": "長期未處理（2026/1/1前建立且從未異動，歷史回補）",
     "unknown": "天數未知",
 }
 STATUS_CLASS = {
@@ -744,6 +803,7 @@ STATUS_CLASS = {
     "longterm_tracking": "st-new", "longterm_overdue": "st-danger",
     "payment_tracking": "st-new", "payment_due": "st-danger",
     "reassigned": "st-danger",
+    "dormant": "st-danger",
     "unknown": "st-unknown",
 }
 # 卡片排序用的緊急程度：數字越小越緊急，排最前面。同一層再依工作天數從多到少排。
@@ -1354,12 +1414,16 @@ def _reassign_period_phrase():
     return "昨天"
 
 
-def build_notify_html(owner_name, deals, reassigned_deals=None):
+def build_notify_html(owner_name, deals, reassigned_deals=None, dormant_deals=None):
     """組出提醒信的 HTML 內容：Verdana 字體、表格呈現（交易名稱／階段／天數／規則），依天數多到少排序。
     reassigned_deals（選填）：主管剛轉派給這位業務的交易，會另外用一個獨立表格呈現，
-    跟原本逾期提醒的表格分開，不會混在同一個表格裡。deals 也可以是空的（代表這個人這次
-    只有新收到的轉派名單、沒有其他逾期交易），這種情況下就不會顯示逾期提醒那一段。"""
+    跟原本逾期提醒的表格分開，不會混在同一個表格裡。dormant_deals（選填）：
+    DORMANT_BACKFILL 一次性回補撈到的「2026/1/1前建立且從未異動」舊交易，也是獨立表格，
+    用專屬措辭說明這是歷史回補、盤點性質，跟正常的逾期提醒天數門檻判斷語氣不同。
+    deals 也可以是空的（代表這個人這次只有新收到的轉派名單或回補舊名單、沒有其他逾期交易），
+    這種情況下就不會顯示逾期提醒那一段。"""
     reassigned_deals = reassigned_deals or []
+    dormant_deals = dormant_deals or []
 
     overdue_section = ""
     if deals:
@@ -1380,10 +1444,19 @@ def build_notify_html(owner_name, deals, reassigned_deals=None):
   <p><b>另外，{reassigned_intro}</b></p>
   {_build_deals_table_html(reassigned_deals)}'''
 
+    dormant_section = ""
+    if dormant_deals:
+        # 一次性舊名單清理回補：這批是「2026/1/1前建立、之後完全沒有任何異動」的存量，
+        # 語氣是請業務盤點是否還有效，不是「逾期沒處理」的口吻，跟正常提醒／重分配都不同。
+        dormant_section = f'''
+  <p><b>另外，你名下有 {len(dormant_deals)} 筆交易是 2026/1/1 前建立、之後完全沒有任何異動紀錄（歷史回補一次性清點），麻煩抽空盤點這些名單是不是還有效，需要的話調整階段或標記無效：</b></p>
+  {_build_deals_table_html(dormant_deals)}'''
+
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
   <p>{esc(owner_name)} 你好，</p>
   {overdue_section}
   {reassigned_section}
+  {dormant_section}
   <p>謝謝！</p>
   {_RULE_REMINDER_HTML}
 </div>'''
@@ -1522,24 +1595,27 @@ def should_send_reminder(entry, current_status, now, repeat_days=URGENT_REMIND_R
     return days_since >= repeat_days
 
 
-def run_auto_notify(records, reassigned):
+def run_auto_notify(records, reassigned, dormant=None):
     """業務個人提醒信。
 
     目前先暫時改回「建草稿」而不是直接寄出（見下面 create_gmail_draft 那行），
     因為剛加入「主管轉派通知」這個新功能，先建草稿讓 Eva 確認合併後的信件格式沒問題，
     確認 OK 之後再把 create_gmail_draft(...) 換回 send_gmail_message(...) 恢復直接寄出。
 
-    一封信最多包含兩段、各自獨立的表格：
+    一封信最多包含三段、各自獨立的表格：
     1. 逾期提醒（可轉派／月底檢核／短期追蹤逾期，跟以前一樣）。
     2. 主管轉派通知：如果這個人最近有新被轉派的交易（reassigned 參數，由 main() 統一呼叫
        fetch_reassigned_deals() + diff_new_reassignments() 算好、也同時用在網頁報表上，
-       確保兩邊看到的轉派名單是同一份，不會兜不起來），不管他有沒有逾期提醒都會收到這段，
-       兩段表格分開呈現，不會混在同一個表格裡。
+       確保兩邊看到的轉派名單是同一份，不會兜不起來），不管他有沒有逾期提醒都會收到這段。
+    3. 舊名單一次性回補（dormant 參數，只有 DORMANT_BACKFILL=true 才會有內容）：
+       2026/1/1 前建立、之後完全沒有任何異動的舊交易，語氣是請業務盤點是否還有效，
+       跟前兩段的口吻不同。三段表格分開呈現，不會混在同一個表格裡。
     """
     if not GMAIL_AUTO_NOTIFY_ENABLED:
         print("尚未設定 GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN，略過自動寄信提醒功能。")
         return
 
+    dormant = dormant or []
     log = load_draft_log()
     now = datetime.now(TAIPEI_TZ)
 
@@ -1562,9 +1638,19 @@ def run_auto_notify(records, reassigned):
     for r in reassigned:
         reassigned_by_owner[(r["業務Email"], r["業務"])].append(r)
 
-    all_owner_keys = set(by_owner.keys()) | set(reassigned_by_owner.keys())
+    dormant_by_owner = defaultdict(list)
+    for r in dormant:
+        # 跟一般逾期提醒共用同一份 log／should_send_reminder 判斷：如果不小心把
+        # DORMANT_BACKFILL=true 又跑第二次（非測試模式），同一筆已經通知過、
+        # 還沒到重複提醒天數的舊名單不會被再寄一次，避免重複騷擾業務。
+        entry = log.get(r["id"])
+        if not should_send_reminder(entry, r["狀態"], now):
+            continue
+        dormant_by_owner[(r["業務Email"], r["業務"])].append(r)
+
+    all_owner_keys = set(by_owner.keys()) | set(reassigned_by_owner.keys()) | set(dormant_by_owner.keys())
     if not all_owner_keys:
-        print("沒有新的需優先處理交易，也沒有新的轉派名單，不用寄提醒信。")
+        print("沒有新的需優先處理交易、沒有新的轉派名單，也沒有回補的舊名單，不用寄提醒信。")
         return
 
     try:
@@ -1584,18 +1670,29 @@ def run_auto_notify(records, reassigned):
             continue
         deals = by_owner.get((owner_email, owner_name), [])
         reassigned_deals = reassigned_by_owner.get((owner_email, owner_name), [])
+        dormant_deals = dormant_by_owner.get((owner_email, owner_name), [])
 
-        reassigned_wording = f"你目前有 {len(reassigned_deals)} 筆重分配名單待聯繫（歷史回補）" if REASSIGN_FULL_BACKFILL else f"你收到 {len(reassigned_deals)} 筆主管轉派的交易"
-        if deals and reassigned_deals:
-            subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需更新進度＋{len(reassigned_deals)} 筆重分配名單"
+        subject_parts = []
+        if deals:
+            subject_parts.append(f"{len(deals)} 筆交易需更新進度")
+        if reassigned_deals:
+            subject_parts.append(f"{len(reassigned_deals)} 筆重分配名單")
+        if dormant_deals:
+            subject_parts.append(f"{len(dormant_deals)} 筆長期未處理舊名單")
+
+        if len(subject_parts) >= 2:
+            subject = f"【ZOHO交易階段提醒】{owner_name} 你有 " + "＋".join(subject_parts)
         elif deals:
             subject = f"【ZOHO交易階段提醒】{owner_name} 你有 {len(deals)} 筆交易需要更新進度"
-        else:
+        elif reassigned_deals:
+            reassigned_wording = f"你目前有 {len(reassigned_deals)} 筆重分配名單待聯繫（歷史回補）" if REASSIGN_FULL_BACKFILL else f"你收到 {len(reassigned_deals)} 筆主管轉派的交易"
             subject = f"【ZOHO交易階段提醒】{owner_name} {reassigned_wording}"
+        else:  # 只有 dormant_deals
+            subject = f"【ZOHO交易階段提醒】{owner_name} 你名下有 {len(dormant_deals)} 筆長期未處理的舊名單（歷史回補），麻煩盤點"
 
         if NOTIFY_TEST_EMAIL:
             subject = f"[測試模式，原收件人：{owner_name} <{owner_email}>] {subject}"
-        html_body = build_notify_html(owner_name, deals, reassigned_deals)
+        html_body = build_notify_html(owner_name, deals, reassigned_deals, dormant_deals)
         to_email = NOTIFY_TEST_EMAIL or owner_email
         # 每封業務個人提醒信都 CC 給 Ambrose，讓他同步掌握進度；測試模式不 CC，避免手動測試時真的通知到他。
         # 業務二課、業務三課另外還要 CC 給課長（見 TEAM_EXTRA_CC），但課長收到自己的提醒信時
@@ -1604,7 +1701,11 @@ def run_auto_notify(records, reassigned):
             cc_email = None
         else:
             cc_list = [MANAGER_SUMMARY_EMAIL]
-            owner_team = (deals[0] if deals else reassigned_deals[0])["業務課"] if (deals or reassigned_deals) else None
+            owner_team = None
+            for lst in (deals, reassigned_deals, dormant_deals):
+                if lst:
+                    owner_team = lst[0]["業務課"]
+                    break
             extra_cc = TEAM_EXTRA_CC.get(owner_team)
             if extra_cc and extra_cc != owner_email:
                 cc_list.append(extra_cc)
@@ -1618,10 +1719,12 @@ def run_auto_notify(records, reassigned):
         sent += 1
         if NOTIFY_TEST_EMAIL:
             continue  # 測試模式不寫入紀錄檔，避免正式排程誤以為這筆已經通知過而漏寄
-        for d in deals:
+        for d in deals + dormant_deals:
             # 是不是「新階段上線當天的第一次提醒」不用在這裡標記，should_send_reminder
             # 會直接用這筆 drafted_at 的日期去跟 NEW_STAGES_ROLLOUT_DATE 比對，
             # 所以不管這次寄送是用哪個版本的程式跑的，下一輪重複提醒都能正確套用規則。
+            # dormant_deals 也寫進同一份 log，是為了擋掉「不小心重跑 DORMANT_BACKFILL
+            # 兩次」時的重複通知（見上面 dormant_by_owner 那段的 should_send_reminder）。
             log[d["id"]] = {
                 "status": d["狀態"], "drafted_at": now_iso, "draft_id": result.get("id"),
             }
@@ -1691,6 +1794,16 @@ def main():
         )
         rows = rows + backfill_rows
 
+    dormant_all = []
+    if DORMANT_BACKFILL:
+        dormant_rows = fetch_dormant_backfill_candidates(token)
+        dormant_all = build_dormant_records(dormant_rows)
+        print(
+            f"⚠️ 舊名單一次性回補模式開啟：找到 {len(dormant_all)} 筆從 {TRACK_SINCE} 前建立、"
+            f"之後完全沒有任何異動的交易，會併入業務個人提醒信裡（獨立表格、不進網頁報表），"
+            f"不需要查 Timeline，這批不會跟 OWNER_CHANGE_BACKFILL 重複（那邊撈的是有異動過的）。"
+        )
+
     cache = load_cache()
     records, new_cache, api_calls = build_records(token, rows, cache)
     save_cache(new_cache)
@@ -1729,7 +1842,7 @@ def main():
         reassign_cache = load_reassign_cache()
         reassigned_new, new_reassign_cache = diff_new_reassignments(reassigned_all, reassign_cache)
         save_reassign_cache(new_reassign_cache)
-        run_auto_notify(records, reassigned_new)
+        run_auto_notify(records, reassigned_new, dormant_all)
         run_manager_summary(records)
     else:
         print("今天是週末，報表照常更新，但略過寄信（業務個人提醒信／主管彙整信都只在工作天寄，重分配快取也不會在今天更新）。")
