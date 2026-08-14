@@ -1449,7 +1449,7 @@ def build_notify_html(owner_name, deals, reassigned_deals=None, dormant_deals=No
         # 一次性舊名單清理回補：這批是「2026/1/1前建立、之後完全沒有任何異動」的存量，
         # 語氣是請業務盤點是否還有效，不是「逾期沒處理」的口吻，跟正常提醒／重分配都不同。
         dormant_section = f'''
-  <p><b>另外，你名下有 {len(dormant_deals)} 筆交易是 2026/1/1 前建立、之後完全沒有任何異動紀錄（歷史回補一次性清點），麻煩抽空盤點這些名單是不是還有效，需要的話調整階段或標記無效：</b></p>
+  <p><b>另外，你名下有 {len(dormant_deals)} 筆交易是 2026/1/1 前建立、進入階段時間過長，麻煩抽空盤點這些名單是不是還有效，需要的話調整階段或標記無效：</b></p>
   {_build_deals_table_html(dormant_deals)}'''
 
     return f'''<div style="font-family:Verdana,'Microsoft JhengHei',Arial,sans-serif;font-size:14px;line-height:1.7;color:#17202a;">
