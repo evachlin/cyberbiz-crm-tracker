@@ -8481,5 +8481,11 @@
   "entered_at": "2026-08-14T09:54:44+08:00",
   "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
   "owner_email": "chester.liao@cyberbiz.io"
+ },
+ "4164702000800062032": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-14T10:35:32+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "angel.yeh@cyberbiz.io"
  }
 }
