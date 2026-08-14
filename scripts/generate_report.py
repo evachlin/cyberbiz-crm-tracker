@@ -791,7 +791,7 @@ STATUS_LABEL = {
     "payment_tracking": "本月確認付款追蹤中",
     "payment_due": "本月確認付款（月底提醒）",
     "reassigned": "重分配，待聯繫客戶",
-    "dormant": "長期未處理（2026/1/1前建立且從未異動，歷史回補）",
+    "dormant": "2026/1/1前建立，進入階段時間過長",
     "unknown": "天數未知",
 }
 STATUS_CLASS = {
