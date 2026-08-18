@@ -659,8 +659,8 @@
   "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算"
  },
  "4164702000780000024": {
-  "stage": "本月有機會",
-  "entered_at": "2026-08-03T14:33:36+08:00",
+  "stage": "本月確認付款",
+  "entered_at": "2026-08-17T11:28:31+08:00",
   "note": null,
   "owner_email": "sarah.lin@cyberbiz.io"
  },
@@ -1114,8 +1114,8 @@
   "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算"
  },
  "4164702000796030024": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-12T15:26:28+08:00",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T15:40:50+08:00",
   "note": null,
   "owner_email": "jack.lin@cyberbiz.io"
  },
@@ -1207,9 +1207,10 @@
   "note": null
  },
  "4164702000796863001": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-04T07:59:15+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算"
+  "stage": "短期追蹤",
+  "entered_at": "2026-08-17T16:21:34+08:00",
+  "note": null,
+  "owner_email": "william.wang@cyberbiz.io"
  },
  "4164702000796876003": {
   "stage": "本月有機會",
@@ -1730,8 +1731,8 @@
   "owner_email": "calvin.chen@cyberbiz.io"
  },
  "4164702000739236001": {
-  "stage": "本月有機會",
-  "entered_at": "2026-08-10T10:23:41+08:00",
+  "stage": "本月確認付款",
+  "entered_at": "2026-08-17T11:29:14+08:00",
   "note": null,
   "owner_email": "sarah.lin@cyberbiz.io"
  },
@@ -2033,8 +2034,8 @@
   "owner_email": "chester.liao@cyberbiz.io"
  },
  "4164702000777214003": {
-  "stage": "短期追蹤",
-  "entered_at": "2026-07-27T09:15:45+08:00",
+  "stage": "長期追蹤",
+  "entered_at": "2026-08-18T08:29:30+08:00",
   "note": null,
   "owner_email": "vincent.wu@cyberbiz.io"
  },
@@ -2165,8 +2166,8 @@
   "owner_email": "steven.lin@cyberbiz.io"
  },
  "4164702000781401008": {
-  "stage": "短期追蹤",
-  "entered_at": "2026-06-10T14:00:48+08:00",
+  "stage": "本月確認付款",
+  "entered_at": "2026-08-17T12:19:38+08:00",
   "note": null,
   "owner_email": "chester.liao@cyberbiz.io"
  },
@@ -2518,8 +2519,8 @@
   "owner_email": "chester.liao@cyberbiz.io"
  },
  "4164702000792943001": {
-  "stage": "短期追蹤",
-  "entered_at": "2026-07-28T11:44:07+08:00",
+  "stage": "本月有機會",
+  "entered_at": "2026-08-17T10:06:19+08:00",
   "note": null,
   "owner_email": "ryder.wu@cyberbiz.io"
  },
@@ -2536,8 +2537,8 @@
   "owner_email": "francis.cheng@cyberbiz.io"
  },
  "4164702000792943007": {
-  "stage": "短期追蹤",
-  "entered_at": "2026-08-03T14:12:56+08:00",
+  "stage": "長期追蹤",
+  "entered_at": "2026-08-18T08:29:19+08:00",
   "note": null,
   "owner_email": "vincent.wu@cyberbiz.io"
  },
@@ -2986,9 +2987,10 @@
   "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算"
  },
  "4164702000798413010": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-08T17:08:14+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算"
+  "stage": "本月確認付款",
+  "entered_at": "2026-08-17T13:33:33+08:00",
+  "note": null,
+  "owner_email": "ryder.wu@cyberbiz.io"
  },
  "4164702000798473003": {
   "stage": "本月有機會",
@@ -2997,8 +2999,8 @@
   "owner_email": "josh.wu@cyberbiz.io"
  },
  "4164702000798504001": {
-  "stage": "待約Demo",
-  "entered_at": "2026-08-10T14:39:19+08:00",
+  "stage": "短期追蹤",
+  "entered_at": "2026-08-17T10:21:28+08:00",
   "note": null,
   "owner_email": "francis.cheng@cyberbiz.io"
  },
@@ -3249,8 +3251,8 @@
   "owner_email": "chester.liao@cyberbiz.io"
  },
  "4164702000798420017": {
-  "stage": "待約Demo",
-  "entered_at": "2026-08-12T11:51:45+08:00",
+  "stage": "長期追蹤",
+  "entered_at": "2026-08-17T10:26:47+08:00",
   "note": null,
   "owner_email": "calvin.chen@cyberbiz.io"
  },
@@ -4477,9 +4479,9 @@
  },
  "4164702000724860031": {
   "stage": "待約Demo",
-  "entered_at": "2026-02-12T10:41:28+08:00",
+  "entered_at": "2026-08-17T17:39:07+08:00",
   "note": null,
-  "owner_email": "chris.zhong@cyberbiz.io"
+  "owner_email": "allen.yk.chen@cyberbiz.io"
  },
  "4164702000724805053": {
   "stage": "保留中",
@@ -6879,8 +6881,8 @@
   "owner_email": "vivian.chan@cyberbiz.io"
  },
  "4164702000783829039": {
-  "stage": "保留中",
-  "entered_at": "2026-08-13T11:32:20+08:00",
+  "stage": "短期追蹤",
+  "entered_at": "2026-08-17T15:56:41+08:00",
   "note": null,
   "owner_email": "ryan.fang@cyberbiz.io"
  },
@@ -8102,8 +8104,8 @@
   "owner_email": "steven.lin@cyberbiz.io"
  },
  "4164702000793847016": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-12T15:26:31+08:00",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T15:40:53+08:00",
   "note": null,
   "owner_email": "jack.lin@cyberbiz.io"
  },
@@ -8359,9 +8361,9 @@
   "owner_email": "vincent.wu@cyberbiz.io"
  },
  "4164702000799738009": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-13T17:21:27+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "保留中",
+  "entered_at": "2026-08-17T11:12:34+08:00",
+  "note": null,
   "owner_email": "shelly.wang@cyberbiz.io"
  },
  "4164702000799898005": {
@@ -8425,9 +8427,9 @@
   "owner_email": "francis.cheng@cyberbiz.io"
  },
  "4164702000800054002": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-14T00:37:54+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "保留中",
+  "entered_at": "2026-08-17T11:21:57+08:00",
+  "note": null,
   "owner_email": "ryan.fang@cyberbiz.io"
  },
  "4164702000800033010": {
@@ -8443,9 +8445,9 @@
   "owner_email": "sabrina.hua@cyberbiz.io"
  },
  "4164702000800056024": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-14T07:08:23+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "短期追蹤",
+  "entered_at": "2026-08-17T16:21:17+08:00",
+  "note": null,
   "owner_email": "william.wang@cyberbiz.io"
  },
  "4164702000800041029": {
@@ -8545,15 +8547,15 @@
   "owner_email": "chuan.luo@cyberbiz.io"
  },
  "4164702000800235018": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-14T15:48:26+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "保留中",
+  "entered_at": "2026-08-17T12:02:55+08:00",
+  "note": null,
   "owner_email": "chester.liao@cyberbiz.io"
  },
  "4164702000800253017": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-14T16:01:13+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T15:40:43+08:00",
+  "note": null,
   "owner_email": "jack.lin@cyberbiz.io"
  },
  "4164702000800240034": {
@@ -8563,22 +8565,22 @@
   "owner_email": "allen.yk.chen@cyberbiz.io"
  },
  "4164702000800227047": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-14T17:32:13+08:00",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T12:11:20+08:00",
   "note": null,
   "owner_email": "vincent.wu@cyberbiz.io"
  },
  "4164702000800228040": {
   "stage": "公司名單",
-  "entered_at": "2026-08-14T17:12:37+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
-  "owner_email": "chris.zhong@cyberbiz.io"
+  "entered_at": "2026-08-17T12:11:09+08:00",
+  "note": null,
+  "owner_email": "hans.yu@cyberbiz.io"
  },
  "4164702000800218048": {
   "stage": "公司名單",
-  "entered_at": "2026-08-14T17:39:15+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
-  "owner_email": "chris.zhong@cyberbiz.io"
+  "entered_at": "2026-08-17T12:11:34+08:00",
+  "note": null,
+  "owner_email": "hans.yu@cyberbiz.io"
  },
  "4164702000800243103": {
   "stage": "公司名單",
@@ -8593,9 +8595,9 @@
   "owner_email": "angel.yeh@cyberbiz.io"
  },
  "4164702000800260148": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-15T07:54:36+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T11:19:37+08:00",
+  "note": null,
   "owner_email": "shelly.wang@cyberbiz.io"
  },
  "4164702000800246162": {
@@ -8641,8 +8643,8 @@
   "owner_email": "vincent.wu@cyberbiz.io"
  },
  "4164702000800244151": {
-  "stage": "保留中",
-  "entered_at": "2026-08-17T09:27:52+08:00",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T13:59:44+08:00",
   "note": null,
   "owner_email": "josh.wu@cyberbiz.io"
  },
@@ -8695,9 +8697,9 @@
   "owner_email": "josh.wu@cyberbiz.io"
  },
  "4164702000800233170": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-16T10:01:55+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T11:30:46+08:00",
+  "note": null,
   "owner_email": "chester.liao@cyberbiz.io"
  },
  "4164702000800236154": {
@@ -8719,15 +8721,15 @@
   "owner_email": "allen.yk.chen@cyberbiz.io"
  },
  "4164702000800269145": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-16T12:58:07+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T11:30:44+08:00",
+  "note": null,
   "owner_email": "chester.liao@cyberbiz.io"
  },
  "4164702000800238128": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-16T13:11:37+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T11:30:48+08:00",
+  "note": null,
   "owner_email": "chester.liao@cyberbiz.io"
  },
  "4164702000800252154": {
@@ -8755,9 +8757,9 @@
   "owner_email": "angel.yeh@cyberbiz.io"
  },
  "4164702000800245156": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-16T18:14:06+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "長期追蹤",
+  "entered_at": "2026-08-17T12:03:05+08:00",
+  "note": null,
   "owner_email": "andy.zhuang@cyberbiz.io"
  },
  "4164702000800252161": {
@@ -8768,9 +8770,9 @@
  },
  "4164702000800238136": {
   "stage": "公司名單",
-  "entered_at": "2026-08-16T20:13:40+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
-  "owner_email": "chris.zhong@cyberbiz.io"
+  "entered_at": "2026-08-17T12:13:16+08:00",
+  "note": null,
+  "owner_email": "allen.yk.chen@cyberbiz.io"
  },
  "4164702000800237153": {
   "stage": "公司名單",
@@ -8845,9 +8847,9 @@
   "owner_email": "josh.wu@cyberbiz.io"
  },
  "4164702000800221160": {
-  "stage": "公司名單",
-  "entered_at": "2026-08-17T09:05:56+08:00",
-  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T14:07:30+08:00",
+  "note": null,
   "owner_email": "francis.cheng@cyberbiz.io"
  },
  "4164702000800214162": {
@@ -8867,5 +8869,179 @@
   "entered_at": "2026-08-17T09:49:17+08:00",
   "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
   "owner_email": "william.wang@cyberbiz.io"
+ },
+ "4164702000800269159": {
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T11:30:42+08:00",
+  "note": null,
+  "owner_email": "chester.liao@cyberbiz.io"
+ },
+ "4164702000800226173": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T13:52:34+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "chris.zhong@cyberbiz.io"
+ },
+ "4164702000800232169": {
+  "stage": "待約Demo",
+  "entered_at": "2026-08-17T15:40:47+08:00",
+  "note": null,
+  "owner_email": "jack.lin@cyberbiz.io"
+ },
+ "4164702000800231182": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T14:32:33+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "eason.hsiao@cyberbiz.io"
+ },
+ "4164702000800249186": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T15:08:20+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "chester.liao@cyberbiz.io"
+ },
+ "4164702000800253188": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T15:19:26+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "angel.yeh@cyberbiz.io"
+ },
+ "4164702000800226184": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T15:19:57+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "jj.hsieh@cyberbiz.io"
+ },
+ "4164702000800223182": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T15:42:12+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "chuan.luo@cyberbiz.io"
+ },
+ "4164702000800213158": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T15:44:56+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "jack.lin@cyberbiz.io"
+ },
+ "4164702000800249192": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T16:08:44+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "calvin.chen@cyberbiz.io"
+ },
+ "4164702000800237183": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T16:23:46+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "francis.cheng@cyberbiz.io"
+ },
+ "4164702000800269176": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T16:30:50+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "shelly.wang@cyberbiz.io"
+ },
+ "4164702000800218186": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T16:38:47+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "jj.hsieh@cyberbiz.io"
+ },
+ "4164702000800236190": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T16:46:52+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "sarah.lin@cyberbiz.io"
+ },
+ "4164702000800240205": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T16:47:52+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "chuan.luo@cyberbiz.io"
+ },
+ "4164702000800214178": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T17:31:25+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "sarah.lin@cyberbiz.io"
+ },
+ "4164702000800214184": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T17:52:02+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "allen.yk.chen@cyberbiz.io"
+ },
+ "4164702000800252184": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T18:22:13+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "vivian.chan@cyberbiz.io"
+ },
+ "4164702000800889001": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T22:58:28+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "chris.zhong@cyberbiz.io"
+ },
+ "4164702000800894001": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-17T23:12:23+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "eason.hsiao@cyberbiz.io"
+ },
+ "4164702000800908001": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T05:56:21+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "angel.yeh@cyberbiz.io"
+ },
+ "4164702000800910001": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T06:28:50+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "shelly.wang@cyberbiz.io"
+ },
+ "4164702000800908008": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T07:36:54+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "andy.zhuang@cyberbiz.io"
+ },
+ "4164702000800915004": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T07:51:51+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "andy.zhuang@cyberbiz.io"
+ },
+ "4164702000800915012": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T09:02:20+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "ryder.wu@cyberbiz.io"
+ },
+ "4164702000800951001": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T09:13:54+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "steven.lin@cyberbiz.io"
+ },
+ "4164702000800954006": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T09:29:50+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "ambrose.tsai@cyberbiz.io"
+ },
+ "4164702000800958001": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T09:45:08+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "vincent.wu@cyberbiz.io"
+ },
+ "4164702000800913004": {
+  "stage": "公司名單",
+  "entered_at": "2026-08-18T09:46:52+08:00",
+  "note": "建立時即為此階段（或超出時間軸追蹤範圍），以建立時間估算",
+  "owner_email": "steven.lin@cyberbiz.io"
  }
 }
